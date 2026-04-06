@@ -457,9 +457,84 @@ function weekDates(){
 }
 function fmtDate(d){return `${d.getDate()} ${CFG.months[d.getMonth()]}`}
 function getRecipe(id){return RECIPES.find(r=>r.id===id)||null}
+
+// ════════════════════════════════════════
+//  KALKULATOR KALORII
+// ════════════════════════════════════════
+let CATALOG = [];
+
+function findInCatalog(ingredientName){
+  const name = ingredientName.toLowerCase();
+  return CATALOG.find(item => {
+    if(name.includes(item.name.toLowerCase())) return true;
+    return (item.aliases||[]).some(a => name.includes(a.toLowerCase()));
+  }) || null;
+}
+
+function parseGrams(amountStr, catalogEntry){
+  if(!amountStr) return 0;
+  const s = amountStr.toLowerCase().trim();
+  if(/^(do\s|przyprawy|do smaku|do podania|do smażenia|do gotowania)/.test(s)) return 0;
+
+  // "(400 g)" lub "(1,5 kg)" w nawiasach
+  const paren = s.match(/\(~?(\d+[\d,.]*)[\s]*(g|kg|ml|l)\)/);
+  if(paren){
+    const v = parseFloat(paren[1].replace(',','.'));
+    return (paren[2]==='kg'||paren[2]==='l') ? v*1000 : v;
+  }
+
+  // "600 g", "1 kg", "100 ml", "~1,5 kg"
+  const direct = s.match(/~?(\d+[\d,.]*)[\s]*(g|kg|ml|l)\b/);
+  if(direct){
+    const v = parseFloat(direct[1].replace(',','.'));
+    return (direct[2]==='kg'||direct[2]==='l') ? v*1000 : v;
+  }
+
+  // "3 łyżki", "2 łyżkę"
+  const spoon = s.match(/(\d+[\d,.]*)\s*łyżk/);
+  if(spoon) return parseFloat(spoon[1].replace(',','.'))*15;
+
+  // "1 łyżeczka", "2 łyżeczki"
+  const tsp = s.match(/(\d+[\d,.]*)\s*łyżeczk/);
+  if(tsp) return parseFloat(tsp[1].replace(',','.'))*5;
+
+  // "pęczek"
+  if(s.includes('pęczek')) return 30;
+
+  // liczba + jednostka (szt./ząbki/duże/małe) → unit_g z katalogu
+  const count = s.match(/^~?(\d+[\d,.]*)/);
+  if(count && catalogEntry?.unit_g){
+    return parseFloat(count[1].replace(',','.'))*catalogEntry.unit_g;
+  }
+
+  return 0;
+}
+
+function calcKcalPerServing(recipe){
+  if(!CATALOG.length) return recipe.kcal_per_serving||0;
+  const ingredients = recipe.ingredients||[];
+  const servings = parseInt(recipe.servings)||1;
+  let totalKcal = 0;
+  for(const ing of ingredients){
+    const entry = findInCatalog(ing.name||'');
+    if(!entry) continue;
+    const grams = parseGrams(ing.amount||'', entry);
+    if(grams > 0) totalKcal += (grams/100)*entry.kcal_per_100g;
+  }
+  if(totalKcal === 0) return recipe.kcal_per_serving||0;
+  return Math.round(totalKcal/servings);
+}
+
+function recipeKcal(recipe){
+  if(!recipe) return 0;
+  if(recipe._kcal_calc !== undefined) return recipe._kcal_calc;
+  recipe._kcal_calc = calcKcalPerServing(recipe);
+  return recipe._kcal_calc;
+}
+
 function dayKcal(di){
   const dp=plan[di]||{};
-  return CFG.slots.reduce((s,sl)=>{const r=getRecipe(dp[sl.id]);return s+(r?r.kcal_per_serving:0)},0);
+  return CFG.slots.reduce((s,sl)=>{const r=getRecipe(dp[sl.id]);return s+(r?recipeKcal(r):0)},0);
 }
 
 // ── Calorie target from profile ──
@@ -480,7 +555,11 @@ function profileKcal(){
 async function initSupabase(){
   setConn("loading");
   try {
-    // 1. Pobierz przepisy z bazy
+    // 1. Pobierz katalog składników
+    const {data: catalogData} = await db.from("ingredients_catalog").select("*");
+    if(catalogData) CATALOG = catalogData;
+
+    // 2. Pobierz przepisy z bazy
     const {data: recipesData, error: recipesError} = await db.from("recipes").select("slug,title,emoji,cuisine,rating,prep_time,kcal_per_serving,grams_per_serving,servings,diet,url,ingredients").not("slug","is",null);
     if(recipesError) throw recipesError;
     if(recipesData && recipesData.length > 0){
@@ -491,7 +570,7 @@ async function initSupabase(){
         cuisine: r.cuisine||"",
         rating: parseFloat(r.rating)||0,
         prep_time: parseInt(r.prep_time)||0,
-        kcal_per_serving: r.kcal_per_serving||0,
+        kcal_per_serving: recipeKcal(r)||0,
         grams_per_serving: r.grams_per_serving||0,
         servings: parseInt(r.servings)||1,
         diet: r.diet||[],
@@ -678,7 +757,7 @@ function cellHTML(di,slotId,mobile){
     <span class="material-symbols-outlined text-[#aeadaa] text-xl">add_circle</span>
     <span class="text-[9px] font-bold uppercase text-[#aeadaa]">Dodaj</span>
   </div>`;
-  const diff=r.kcal_per_serving-slot.kcal;
+  const diff=recipeKcal(r)-slot.kcal;
   const kc=Math.abs(diff)<=100?"text-secondary":diff>0?"text-primary":"text-[#805100]";
   return `<div class="meal-cell ${h} rounded-xl p-2.5 bg-surface-container-lowest flex flex-col justify-between cursor-pointer" onclick="openModal(${di},'${slotId}')">
     <div class="flex items-start justify-between gap-1">
@@ -690,7 +769,7 @@ function cellHTML(di,slotId,mobile){
         onclick="event.stopPropagation();clearMeal(${di},'${slotId}')">close</button>
     </div>
     <div class="flex items-center justify-between">
-      <span class="text-[11px] font-bold ${kc}">${r.kcal_per_serving} kcal</span>
+      <span class="text-[11px] font-bold ${kc}">${recipeKcal(r)} kcal</span>
       <span class="text-[9px] text-outline flex items-center gap-0.5"><span class="material-symbols-outlined text-[11px]">schedule</span>${r.prep_time} min</span>
     </div>
   </div>`;
@@ -761,7 +840,7 @@ function renderDietaToday(target){
       <span class="text-xs text-outline">${slot.kcal} kcal (cel)</span>
     </div>`;
 
-    const diff = r.kcal_per_serving - slot.kcal;
+    const diff = recipeKcal(r) - slot.kcal;
     const kcalCls = Math.abs(diff)<=100?"text-secondary":diff>0?"text-primary":"text-[#805100]";
     return `<div class="flex items-center gap-3 p-3 bg-surface-container-lowest rounded-xl">
       <span class="text-2xl">${r.emoji}</span>
@@ -770,7 +849,7 @@ function renderDietaToday(target){
         <div class="text-sm font-semibold text-on-surface leading-tight truncate">${r.title}</div>
       </div>
       <div class="text-right flex-shrink-0">
-        <div class="text-sm font-bold ${kcalCls}">${r.kcal_per_serving} kcal</div>
+        <div class="text-sm font-bold ${kcalCls}">${recipeKcal(r)} kcal</div>
         <div class="text-[10px] text-outline">${r.grams_per_serving} g · ${r.prep_time} min</div>
       </div>
     </div>`;
@@ -839,7 +918,7 @@ function renderModalList(){
   if(!filtered.length){html+=`<p class="text-center text-on-surface-variant text-sm py-8">Brak pasujących przepisów</p>`}
   else html+=filtered.map(r=>{
     const sel=cur===r.id;
-    const diff=r.kcal_per_serving-slot.kcal;
+    const diff=recipeKcal(r)-slot.kcal;
     const kc=Math.abs(diff)<=100?"text-secondary":diff>0?"text-primary":"text-[#805100]";
     const tags=r.diet.map(d=>`<span class="bg-secondary-container text-on-secondary-container text-[9px] font-bold px-1.5 py-0.5 rounded-full">${d}</span>`).join("");
     return `<button onclick="pickRecipe('${r.id}')" class="w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-colors hover:bg-primary/5 ${sel?"bg-primary/10 ring-2 ring-primary/30":""}">
@@ -850,7 +929,7 @@ function renderModalList(){
           ${sel?'<span class="material-symbols-outlined text-primary text-[14px]">check_circle</span>':""}
         </div>
         <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span class="text-[11px] font-bold ${kc}">${r.kcal_per_serving} kcal · ${r.grams_per_serving} g</span>
+          <span class="text-[11px] font-bold ${kc}">${recipeKcal(r)} kcal · ${r.grams_per_serving} g</span>
           <span class="text-[10px] text-outline">· ⏱ ${r.prep_time} min · ⭐ ${r.rating}</span>
           ${tags}
         </div>
