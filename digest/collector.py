@@ -163,7 +163,7 @@ def call_gemini(prompt):
                f"{model}:generateContent?key={GEMINI_API_KEY}")
         body = json.dumps({
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"maxOutputTokens": 2000, "temperature": 0.7}
+            "generationConfig": {"maxOutputTokens": 8192, "temperature": 0.7}
         }).encode()
         try:
             req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
@@ -176,7 +176,13 @@ def call_gemini(prompt):
                 print(f"  [Gemini] Pełna odpowiedź: {json.dumps(candidate)[:500]}", file=sys.stderr)
                 last_err = RuntimeError(f"finishReason={finish}")
                 continue
-            return candidate["content"]["parts"][0]["text"]
+            parts = candidate.get("content", {}).get("parts", [])
+            if not parts:
+                last_err = RuntimeError(f"Brak parts w odpowiedzi (finishReason={finish})")
+                continue
+            if finish == "MAX_TOKENS":
+                print("  [Gemini] Uwaga: odpowiedź ucięta (MAX_TOKENS)", file=sys.stderr)
+            return parts[0]["text"]
         except urllib.error.HTTPError as e:
             body_err = e.read().decode("utf-8", errors="replace")[:300]
             print(f"  [Gemini] {model}: HTTP {e.code} — {body_err}", file=sys.stderr)
