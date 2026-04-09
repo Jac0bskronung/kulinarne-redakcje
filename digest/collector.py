@@ -263,7 +263,7 @@ def save_to_supabase(title, content, ai_items, football_results, github_projects
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}",
             "Content-Type": "application/json",
-            "Prefer": "return=minimal"
+            "Prefer": "resolution=merge-duplicates,return=minimal"
         }
     )
     try:
