@@ -189,6 +189,8 @@ def call_gemini(prompt):
     raise RuntimeError(f"Gemini: wszystkie modele zawiodły. Ostatni błąd: {last_err}")
 
 def save_to_supabase(title, content, ai_items, football_results):
+    url = f"{SUPABASE_URL}/rest/v1/digests"
+    print(f"  [Supabase] POST → {url}")
     body = json.dumps({
         "date": DATE_STR,
         "edition": EDITION,
@@ -199,7 +201,7 @@ def save_to_supabase(title, content, ai_items, football_results):
     }).encode()
 
     req = urllib.request.Request(
-        f"{SUPABASE_URL}/rest/v1/digests",
+        url,
         data=body,
         headers={
             "apikey": SUPABASE_KEY,
@@ -210,12 +212,13 @@ def save_to_supabase(title, content, ai_items, football_results):
     )
     try:
         with urllib.request.urlopen(req, timeout=15) as r:
-            print(f"  [Supabase] Status: {r.status}")
+            resp_body = r.read().decode("utf-8", errors="replace")
+            print(f"  [Supabase] OK {r.status}: {resp_body[:200]}")
     except urllib.error.HTTPError as e:
         body_err = e.read().decode("utf-8", errors="replace")[:500]
-        print(f"  [Supabase] HTTP {e.code}: {body_err}", file=sys.stderr)
+        print(f"  [Supabase] BŁĄD HTTP {e.code}: {body_err}")
     except urllib.error.URLError as e:
-        print(f"  [Supabase] URLError (sprawdź SUPABASE_URL w sekretach): {e}", file=sys.stderr)
+        print(f"  [Supabase] BŁĄD URL: {e}")
 
 def save_to_wiki(title, content):
     os.makedirs(WIKI_DIR, exist_ok=True)
