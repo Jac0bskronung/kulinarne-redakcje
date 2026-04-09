@@ -28,11 +28,11 @@ EDITION_PL = "Poranny" if EDITION == "morning" else "Wieczorny"
 
 # ── RSS Sources ─────────────────────────────────────────────────────────────
 RSS_FEEDS = [
-    ("Anthropic Blog",  "https://www.anthropic.com/rss.xml"),
-    ("TLDR AI",         "https://tldr.tech/ai/rss"),
-    ("The Rundown AI",  "https://www.therundown.ai/rss"),
+    ("TLDR AI",         "https://tldr.tech/api/rss/ai"),
     ("HackerNews AI",   "https://hnrss.org/newest?q=AI+LLM+claude+gemini&count=15"),
     ("Simon Willison",  "https://simonwillison.net/atom/entries/"),
+    ("VentureBeat AI",  "https://venturebeat.com/category/ai/feed/"),
+    ("MIT Tech Review", "https://www.technologyreview.com/feed/"),
 ]
 
 def fetch_url(url, headers=None, timeout=15):
@@ -137,17 +137,26 @@ Napisz zwięzły, czytelny artykuł PO POLSKU w formacie Markdown:
 Styl: profesjonalny ale przystępny. Tłumacz tytuły i terminy na polski. Bądź konkretny, nie lej wody."""
 
 def call_gemini(prompt):
-    url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
-           f"gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}")
-    body = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": 2000, "temperature": 0.7}
-    }).encode()
-
-    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        data = json.loads(r.read())
-    return data["candidates"][0]["content"]["parts"][0]["text"]
+    # Próbuj modele od najnowszego
+    models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest"]
+    last_err = None
+    for model in models:
+        url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+               f"{model}:generateContent?key={GEMINI_API_KEY}")
+        body = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"maxOutputTokens": 2000, "temperature": 0.7}
+        }).encode()
+        try:
+            req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                data = json.loads(r.read())
+            print(f"  [Gemini] Model: {model}")
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except urllib.error.HTTPError as e:
+            print(f"  [Gemini] {model}: HTTP {e.code}", file=sys.stderr)
+            last_err = e
+    raise last_err
 
 def save_to_supabase(title, content, ai_items, football_results):
     body = json.dumps({
