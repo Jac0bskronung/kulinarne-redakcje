@@ -139,7 +139,7 @@ Styl: profesjonalny ale przystępny. Tłumacz tytuły i terminy na polski. Bąd�
 def list_gemini_models():
     """Zwraca listę dostępnych modeli Gemini."""
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1/models?key={GEMINI_API_KEY}"
         raw = fetch_url(url)
         data = json.loads(raw)
         names = [m["name"].replace("models/", "") for m in data.get("models", [])
@@ -159,7 +159,7 @@ def call_gemini(prompt):
 
     last_err = None
     for model in models:
-        url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+        url = (f"https://generativelanguage.googleapis.com/v1/models/"
                f"{model}:generateContent?key={GEMINI_API_KEY}")
         body = json.dumps({
             "contents": [{"parts": [{"text": prompt}]}],
