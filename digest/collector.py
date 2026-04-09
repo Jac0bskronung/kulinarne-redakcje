@@ -214,7 +214,8 @@ def save_to_supabase(title, content, ai_items, football_results):
     except urllib.error.HTTPError as e:
         body_err = e.read().decode("utf-8", errors="replace")[:500]
         print(f"  [Supabase] HTTP {e.code}: {body_err}", file=sys.stderr)
-        raise
+    except urllib.error.URLError as e:
+        print(f"  [Supabase] URLError (sprawdź SUPABASE_URL w sekretach): {e}", file=sys.stderr)
 
 def save_to_wiki(title, content):
     os.makedirs(WIKI_DIR, exist_ok=True)
