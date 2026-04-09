@@ -200,6 +200,14 @@
       </div>
     </div>
 
+    <!-- Sekcja GitHub -->
+    <div id="digest-github-section" class="bg-surface-container rounded-3xl p-5 md:p-6 hidden">
+      <h3 class="font-headline font-bold text-base mb-4 flex items-center gap-2">
+        <span class="text-xl">🚀</span> Projekty GitHub warte uwagi
+      </h3>
+      <div id="digest-github" class="space-y-4 text-sm text-on-surface leading-relaxed"></div>
+    </div>
+
     <!-- Sekcja piłka nożna -->
     <div class="bg-surface-container rounded-3xl p-5 md:p-6">
       <h3 class="font-headline font-bold text-base mb-4 flex items-center gap-2">
@@ -804,6 +812,21 @@ function renderDigestSections(content, footballResults){
       const bold = l.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
       return `<p class="pb-3 border-b border-outline-variant/30 last:border-0">${bold}</p>`;
     }).join("");
+  }
+
+  // GitHub projects section
+  const ghMatch = content.match(/##\s*🚀[^\n]*\n([\s\S]*?)(?=##|$)/);
+  const ghSection = document.getElementById("digest-github-section");
+  if(ghMatch && ghMatch[1].trim()){
+    const lines = ghMatch[1].trim().split("\n").filter(Boolean);
+    document.getElementById("digest-github").innerHTML = lines.map(l=>{
+      const withLinks = l.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" class="text-primary font-semibold hover:underline">$1</a>');
+      const withBold = withLinks.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      return `<p class="pb-3 border-b border-outline-variant/30 last:border-0">${withBold}</p>`;
+    }).join("");
+    ghSection.classList.remove("hidden");
+  } else {
+    ghSection.classList.add("hidden");
   }
 
   // Football results from jsonb
