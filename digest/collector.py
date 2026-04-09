@@ -169,8 +169,14 @@ def call_gemini(prompt):
             req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=60) as r:
                 data = json.loads(r.read())
-            print(f"  [Gemini] Użyto modelu: {model}")
-            return data["candidates"][0]["content"]["parts"][0]["text"]
+            candidate = data["candidates"][0]
+            finish = candidate.get("finishReason", "UNKNOWN")
+            print(f"  [Gemini] Model: {model}, finishReason: {finish}")
+            if finish not in ("STOP", "MAX_TOKENS"):
+                print(f"  [Gemini] Pełna odpowiedź: {json.dumps(candidate)[:500]}", file=sys.stderr)
+                last_err = RuntimeError(f"finishReason={finish}")
+                continue
+            return candidate["content"]["parts"][0]["text"]
         except urllib.error.HTTPError as e:
             body_err = e.read().decode("utf-8", errors="replace")[:300]
             print(f"  [Gemini] {model}: HTTP {e.code} — {body_err}", file=sys.stderr)
