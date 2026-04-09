@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:aniagotuje.pl)",
+      "WebSearch",
+      "WebFetch(domain:developers.googleblog.com)",
+      "WebFetch(domain:almcorp.com)",
+      "WebFetch(domain:www.nxcode.io)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(npm view:*)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(python -c ':*)",
+      "Bash(chmod +x /c/Users/kubas/bin/gemini)",
+      "Bash(gemini \"Powiedz 'działa' po polsku\")",
+      "Bash(gemini \"Co to jest za plik i jaką ma strukturę?\" --context CLAUDE.md)",
+      "Bash(gemini \"O czym jest nasz projekt?\" -c wiki/index.md)",
+      "Bash(grep:*)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__get_project_url",
+      "mcp__claude_ai_Supabase__get_publishable_keys",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "WebFetch(domain:kalkulatorkalorii.net)",
+      "Read(//c/Users/kubas/Documents/**)",
+      "Read(//c/Users/kubas/Documents/Claude/**)",
+      "Read(//c/Users/kubas/**)"
+    ]
+  }
+}

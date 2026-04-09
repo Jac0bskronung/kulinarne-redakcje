@@ -1,0 +1,39 @@
+name: Daily Digest
+
+on:
+  schedule:
+    - cron: "30 3 * * *"   # 05:30 czasu polskiego (UTC+2)
+    - cron: "30 16 * * *"  # 18:30 czasu polskiego (UTC+2)
+  workflow_dispatch:        # uruchomienie ręczne z GitHub UI
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # potrzebne do commitu wiki
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run collector
+        env:
+          GEMINI_API_KEY:       ${{ secrets.GEMINI_API_KEY }}
+          FOOTBALL_API_KEY:     ${{ secrets.FOOTBALL_API_KEY }}
+          SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          WIKI_DIR:             wiki/digest
+        run: python digest/collector.py
+
+      - name: Commit digest to wiki
+        run: |
+          git config user.name  "digest-bot"
+          git config user.email "digest-bot@users.noreply.github.com"
+          git add wiki/digest/
+          git diff --staged --quiet || git commit -m "digest: $(date +'%Y-%m-%d %H:%M') PL"
+          git push

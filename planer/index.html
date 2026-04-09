@@ -84,6 +84,10 @@
     onclick="switchTab('dieta')">
     <span class="material-symbols-outlined text-[16px] align-middle mr-1">monitor_weight</span>Dieta
   </button>
+  <button id="tab-btn-digest" class="tab-btn rounded-none font-headline font-bold text-sm px-5 py-3 border-b-2 border-transparent"
+    onclick="switchTab('digest')">
+    <span class="material-symbols-outlined text-[16px] align-middle mr-1">newspaper</span>Digest
+  </button>
 </div>
 
 <!-- ══════════ MAIN ══════════ -->
@@ -167,6 +171,67 @@
 
   </div>
 
+  <!-- ─── TAB: DIGEST ─── -->
+  <div id="tab-digest" class="hidden space-y-5">
+
+    <!-- Header z datą i edycją -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-headline font-bold text-xl" id="digest-title">Ładowanie digestu…</h2>
+        <p class="text-sm text-on-surface-variant mt-0.5" id="digest-meta"></p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="loadDigest('morning')" id="digest-btn-morning"
+          class="chip text-xs font-bold">🌅 Poranny</button>
+        <button onclick="loadDigest('evening')" id="digest-btn-evening"
+          class="chip text-xs font-bold">🌆 Wieczorny</button>
+      </div>
+    </div>
+
+    <!-- Sekcja AI -->
+    <div class="bg-surface-container rounded-3xl p-5 md:p-6">
+      <h3 class="font-headline font-bold text-base mb-4 flex items-center gap-2">
+        <span class="text-xl">🤖</span> AI & Tech
+      </h3>
+      <div id="digest-ai" class="space-y-4 text-sm text-on-surface leading-relaxed">
+        <div class="animate-pulse h-4 bg-surface-container-high rounded w-3/4"></div>
+        <div class="animate-pulse h-4 bg-surface-container-high rounded w-full"></div>
+        <div class="animate-pulse h-4 bg-surface-container-high rounded w-2/3"></div>
+      </div>
+    </div>
+
+    <!-- Sekcja piłka nożna -->
+    <div class="bg-surface-container rounded-3xl p-5 md:p-6">
+      <h3 class="font-headline font-bold text-base mb-4 flex items-center gap-2">
+        <span class="text-xl">⚽</span> Piłka nożna
+      </h3>
+      <div id="digest-football" class="space-y-2 text-sm"></div>
+    </div>
+
+    <!-- Sekcja wnioski -->
+    <div class="bg-tertiary-container/40 rounded-3xl p-5 md:p-6">
+      <h3 class="font-headline font-bold text-base mb-3 flex items-center gap-2">
+        <span class="text-xl">💡</span> To warto zapamiętać
+      </h3>
+      <div id="digest-takeaways" class="text-sm text-on-surface leading-relaxed space-y-2"></div>
+    </div>
+
+    <!-- Pełny artykuł (toggle) -->
+    <details class="bg-surface-container-low rounded-3xl p-5 md:p-6">
+      <summary class="font-headline font-bold text-sm cursor-pointer text-on-surface-variant hover:text-primary">
+        Pełny artykuł (Markdown)
+      </summary>
+      <pre id="digest-full" class="mt-4 text-xs text-on-surface-variant whitespace-pre-wrap break-words font-body leading-relaxed"></pre>
+    </details>
+
+    <!-- Historia digestów -->
+    <div class="bg-surface-container-low rounded-3xl p-5 md:p-6">
+      <h3 class="font-headline font-bold text-base mb-3">Poprzednie digesty</h3>
+      <div id="digest-history" class="space-y-2 text-sm"></div>
+    </div>
+
+  </div>
+
 </main>
 
 <!-- ══════════ BOTTOM NAV ══════════ -->
@@ -182,6 +247,10 @@
   <button onclick="switchTab('dieta')" id="nav-dieta" class="flex flex-col items-center gap-0.5 text-on-surface-variant hover:text-primary transition-colors px-5 py-1.5">
     <span class="material-symbols-outlined">monitor_weight</span>
     <span class="text-[11px] font-medium">Dieta</span>
+  </button>
+  <button onclick="switchTab('digest')" id="nav-digest" class="flex flex-col items-center gap-0.5 text-on-surface-variant hover:text-primary transition-colors px-5 py-1.5">
+    <span class="material-symbols-outlined">newspaper</span>
+    <span class="text-[11px] font-medium">Digest</span>
   </button>
   <button onclick="resetWeek()" class="flex flex-col items-center gap-0.5 text-on-surface-variant hover:text-primary transition-colors px-5 py-1.5">
     <span class="material-symbols-outlined">restart_alt</span>
@@ -651,7 +720,7 @@ function setConn(state){
 // ════════════════════════════════════════
 function switchTab(tab){
   activeTab = tab;
-  ["planer","dieta"].forEach(t=>{
+  ["planer","dieta","digest"].forEach(t=>{
     document.getElementById(`tab-${t}`).classList.toggle("hidden", t!==tab);
     const btn = document.getElementById(`tab-btn-${t}`);
     const nav = document.getElementById(`nav-${t}`);
@@ -665,6 +734,141 @@ function switchTab(tab){
     }
   });
   if(tab==="dieta") renderDieta();
+  if(tab==="digest") loadDigest();
+}
+
+// ════════════════════════════════════════
+//  DIGEST
+// ════════════════════════════════════════
+let digestLoaded = null;
+
+async function loadDigest(edition){
+  const today = new Date().toISOString().slice(0,10);
+  const hour  = new Date().getHours();
+  if(!edition) edition = hour < 12 ? "morning" : "evening";
+
+  // Highlight active button
+  ["morning","evening"].forEach(e=>{
+    document.getElementById(`digest-btn-${e}`)?.classList.toggle("active", e===edition);
+  });
+
+  if(digestLoaded === edition) return;
+  digestLoaded = null;
+
+  document.getElementById("digest-title").textContent = "Ładowanie…";
+  document.getElementById("digest-ai").innerHTML = skeletonLines(4);
+  document.getElementById("digest-football").innerHTML = skeletonLines(3);
+  document.getElementById("digest-takeaways").innerHTML = skeletonLines(3);
+
+  try {
+    const { data, error } = await db
+      .from("digests")
+      .select("*")
+      .eq("edition", edition)
+      .order("date", { ascending: false })
+      .limit(1)
+      .single();
+
+    if(error || !data){
+      document.getElementById("digest-title").textContent = "Brak digestu";
+      document.getElementById("digest-meta").textContent = "Digest pojawi się o 5:30 lub 18:30.";
+      document.getElementById("digest-ai").innerHTML = "<p class='text-on-surface-variant'>Brak danych.</p>";
+      document.getElementById("digest-football").innerHTML = "";
+      document.getElementById("digest-takeaways").innerHTML = "";
+      return;
+    }
+
+    digestLoaded = edition;
+    const edPL = edition === "morning" ? "Poranny" : "Wieczorny";
+    document.getElementById("digest-title").textContent = data.title || `Digest ${edPL} — ${data.date}`;
+    document.getElementById("digest-meta").textContent = `${data.date} · ${edPL}`;
+    document.getElementById("digest-full").textContent = data.content;
+
+    // Parse sections from markdown content
+    renderDigestSections(data.content, data.football_results || []);
+
+    // History
+    loadDigestHistory();
+  } catch(e) {
+    document.getElementById("digest-title").textContent = "Błąd ładowania";
+    document.getElementById("digest-meta").textContent = e.message;
+  }
+}
+
+function renderDigestSections(content, footballResults){
+  // Extract AI section
+  const aiMatch = content.match(/##\s*🤖[^\n]*\n([\s\S]*?)(?=##|$)/);
+  if(aiMatch){
+    const lines = aiMatch[1].trim().split("\n").filter(Boolean);
+    document.getElementById("digest-ai").innerHTML = lines.map(l=>{
+      const bold = l.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      return `<p class="pb-3 border-b border-outline-variant/30 last:border-0">${bold}</p>`;
+    }).join("");
+  }
+
+  // Football results from jsonb
+  if(footballResults.length){
+    document.getElementById("digest-football").innerHTML = footballResults.map(r=>
+      `<div class="flex items-center justify-between py-2 border-b border-outline-variant/20 last:border-0">
+        <span class="font-medium">${r.home}</span>
+        <span class="font-headline font-bold text-primary px-3">${r.score}</span>
+        <span class="font-medium">${r.away}</span>
+        <span class="text-xs text-on-surface-variant ml-2">${r.competition}</span>
+      </div>`
+    ).join("");
+  } else {
+    document.getElementById("digest-football").innerHTML = "<p class='text-on-surface-variant text-sm'>Brak meczów w ostatnich 3 dniach.</p>";
+  }
+
+  // Takeaways section
+  const twMatch = content.match(/##\s*💡[^\n]*\n([\s\S]*?)(?=##|$)/);
+  if(twMatch){
+    const bullets = twMatch[1].trim().split("\n").filter(l=>l.trim().startsWith("-"));
+    document.getElementById("digest-takeaways").innerHTML = bullets.map(b=>
+      `<div class="flex gap-2"><span class="text-tertiary mt-0.5">▸</span><span>${b.replace(/^-\s*/,"")}</span></div>`
+    ).join("");
+  }
+}
+
+async function loadDigestHistory(){
+  try {
+    const { data } = await db
+      .from("digests")
+      .select("id,date,edition,title")
+      .order("date", { ascending: false })
+      .limit(10);
+
+    if(!data?.length) return;
+    const edPL = e => e==="morning" ? "🌅" : "🌆";
+    document.getElementById("digest-history").innerHTML = data.map(d=>
+      `<button onclick="loadDigestById('${d.id}')"
+        class="w-full text-left flex items-center gap-2 p-2 rounded-xl hover:bg-surface-container transition-colors">
+        <span>${edPL(d.edition)}</span>
+        <span class="font-medium">${d.date}</span>
+        <span class="text-on-surface-variant text-xs truncate">${d.title}</span>
+      </button>`
+    ).join("");
+  } catch(e){}
+}
+
+async function loadDigestById(id){
+  try {
+    const { data } = await db.from("digests").select("*").eq("id",id).single();
+    if(!data) return;
+    digestLoaded = null;
+    document.getElementById("digest-title").textContent = data.title;
+    document.getElementById("digest-meta").textContent = `${data.date} · ${data.edition==="morning"?"Poranny":"Wieczorny"}`;
+    document.getElementById("digest-full").textContent = data.content;
+    renderDigestSections(data.content, data.football_results || []);
+    window.scrollTo({top:0,behavior:"smooth"});
+  } catch(e){}
+}
+
+function skeletonLines(n){
+  const widths = ["w-3/4","w-full","w-2/3","w-5/6","w-1/2"];
+  return Array.from({length:n},(_,i)=>
+    `<div class="animate-pulse h-3 bg-surface-container-high rounded ${widths[i%widths.length]} mb-2"></div>`
+  ).join("");
 }
 
 // ════════════════════════════════════════
