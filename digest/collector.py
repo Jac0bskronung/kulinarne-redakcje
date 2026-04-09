@@ -153,8 +153,7 @@ def list_gemini_models():
 def call_gemini(prompt):
     # Pobierz dostępne modele, preferuj flash
     available = list_gemini_models()
-    preferred = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash",
-                 "gemini-2.5-pro", "gemini-2.0-pro"]
+    preferred = ["gemini-2.0-flash-lite", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.5-flash"]
     models = [m for m in preferred if m in available] or available[:3] or preferred
 
     last_err = None
