@@ -22,7 +22,7 @@ sys.stdin  = io.TextIOWrapper(sys.stdin.buffer,  encoding="utf-8", errors="repla
 
 from google import genai
 
-API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyA8Z9pQEHJz_kjMCCi_0LsoBkMO1ahAvgs")
+API_KEY = os.environ.get("GEMINI_API_KEY", "")
 MODEL = "models/gemini-3.1-pro-preview"
 
 client = genai.Client(api_key=API_KEY)

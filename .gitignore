@@ -1,0 +1,9 @@
+# Sekrety — nigdy nie commituj
+.claude/settings.json
+.claude/settings.local.json
+.env
+*.env
+
+# Python
+__pycache__/
+*.pyc
