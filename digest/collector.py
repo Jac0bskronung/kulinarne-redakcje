@@ -71,6 +71,51 @@ def fetch_rss(name, url):
         print(f"  [RSS] {name}: {e}", file=sys.stderr)
         return []
 
+def fetch_github_trending():
+    """Zwraca listę ciekawych/rosnących projektów AI z GitHub (ostatnie 30 dni)."""
+    github_token = os.environ.get("GITHUB_TOKEN", "")
+    headers = {
+        "User-Agent": "DigestBot/1.0",
+        "Accept": "application/vnd.github+json",
+    }
+    if github_token:
+        headers["Authorization"] = f"Bearer {github_token}"
+
+    results = []
+    date_from = (NOW - datetime.timedelta(days=30)).strftime("%Y-%m-%d")
+    # Pojedyncze zapytanie — mniej ryzyko rate-limit bez tokena
+    queries = [
+        f"topic:llm+created:>{date_from}&sort=stars&order=desc",
+        f"topic:ai-agent+created:>{date_from}&sort=stars&order=desc",
+    ]
+    seen = set()
+    for q in queries:
+        url = f"https://api.github.com/search/repositories?q={q}&per_page=6"
+        try:
+            raw = fetch_url(url, headers=headers, timeout=20)
+            data = json.loads(raw)
+            if "items" not in data:
+                print(f"  [GitHub] Nieoczekiwana odpowiedź: {str(data)[:200]}", file=sys.stderr)
+                continue
+            for repo in data["items"]:
+                name = repo["full_name"]
+                if name in seen:
+                    continue
+                seen.add(name)
+                results.append({
+                    "name": name,
+                    "url": repo["html_url"],
+                    "description": (repo.get("description") or "")[:200],
+                    "stars": repo["stargazers_count"],
+                    "language": repo.get("language") or "—",
+                    "topics": repo.get("topics", [])[:5],
+                })
+            print(f"  [GitHub] Zapytanie '{q[:40]}...': {len(data['items'])} wyników")
+        except Exception as e:
+            print(f"  [GitHub] BŁĄD: {e}", file=sys.stderr)
+    return results[:8]
+
+
 def fetch_football():
     """Wyniki La Liga (PD) i Ligi Mistrzów (CL) z ostatnich 3 dni."""
     results = []
@@ -105,7 +150,7 @@ def fetch_football():
 
     return results
 
-def build_prompt(ai_items, football_results):
+def build_prompt(ai_items, football_results, github_projects):
     ai_section = "\n".join(
         f"- [{s['source']}] {s['title']}: {s['summary'][:200]}"
         for s in ai_items
@@ -114,6 +159,10 @@ def build_prompt(ai_items, football_results):
         f"- {r['competition']} ({r['date']}): {r['home']} {r['score']} {r['away']}"
         for r in football_results
     ) or "Brak wyników w ostatnich 3 dniach."
+    gh_section = "\n".join(
+        f"- {p['name']} ({p['stars']}★, {p['language']}): {p['description']}"
+        for p in github_projects
+    ) or "Brak danych."
 
     return f"""Jesteś redaktorem polskiego centrum informacji. Napisz digest {EDITION_PL.lower()} na {DATE_STR}.
 
@@ -121,6 +170,9 @@ def build_prompt(ai_items, football_results):
 
 ### AI & Tech newsy:
 {ai_section}
+
+### Rosnące projekty AI na GitHub:
+{gh_section}
 
 ### Wyniki piłkarskie:
 {fb_section}
@@ -131,8 +183,11 @@ Napisz zwięzły, czytelny artykuł PO POLSKU w formacie Markdown:
 1. Nagłówek H1: "Digest {EDITION_PL} — {DATE_STR}"
 2. Sekcja "## 🤖 AI & Tech" — 4-6 najciekawszych newsów, każdy jako:
    **Tytuł po polsku** — 2-3 zdania wyjaśnienia. [Źródło]
-3. Sekcja "## ⚽ Piłka nożna" — wyniki meczów, krótki komentarz do najciekawszych
-4. Sekcja "## 💡 To warto zapamiętać" — 3 bullet pointy z kluczowymi wnioskami dnia
+3. Sekcja "## 🚀 Projekty GitHub warte uwagi" — 2-3 najbardziej interesujące projekty z powyższej listy, każdy jako:
+   **[nazwa repo](URL)** (język, liczba gwiazdek★) — 2 zdania: co to jest i dlaczego warto obserwować.
+   Wybieraj projekty z potencjałem lub ciekawym zastosowaniem, nie tylko te z największą liczbą gwiazdek.
+4. Sekcja "## ⚽ Piłka nożna" — wyniki meczów, krótki komentarz do najciekawszych
+5. Sekcja "## 💡 To warto zapamiętać" — 3 bullet pointy z kluczowymi wnioskami dnia
 
 Styl: profesjonalny ale przystępny. Tłumacz tytuły i terminy na polski. Bądź konkretny, nie lej wody."""
 
@@ -188,7 +243,7 @@ def call_gemini(prompt):
             last_err = e
     raise RuntimeError(f"Gemini: wszystkie modele zawiodły. Ostatni błąd: {last_err}")
 
-def save_to_supabase(title, content, ai_items, football_results):
+def save_to_supabase(title, content, ai_items, football_results, github_projects):
     url = f"{SUPABASE_URL}/rest/v1/digests"
     print(f"  [Supabase] POST → {url}")
     body = json.dumps({
@@ -197,7 +252,8 @@ def save_to_supabase(title, content, ai_items, football_results):
         "title": title,
         "content": content,
         "ai_items": ai_items,
-        "football_results": football_results
+        "football_results": football_results,
+        "github_projects": github_projects
     }).encode()
 
     req = urllib.request.Request(
@@ -253,16 +309,20 @@ def main():
     football_results = fetch_football()
     print(f"   Znaleziono {len(football_results)} wyników")
 
+    print(f"\n3. Pobieranie trendów GitHub AI...")
+    github_projects = fetch_github_trending()
+    print(f"   Znaleziono {len(github_projects)} projektów")
+
     # 2. Generuj artykuł
-    print(f"\n3. Generowanie artykułu (Claude Sonnet)...")
-    prompt = build_prompt(ai_items[:20], football_results)  # max 20 AI newsów
+    print(f"\n4. Generowanie artykułu...")
+    prompt = build_prompt(ai_items[:20], football_results, github_projects)
     content = call_gemini(prompt)
     title = f"Digest {EDITION_PL} — {DATE_STR}"
     print(f"   Wygenerowano {len(content)} znaków")
 
     # 3. Zapisz
-    print(f"\n4. Zapisywanie...")
-    save_to_supabase(title, content, ai_items[:20], football_results)
+    print(f"\n5. Zapisywanie...")
+    save_to_supabase(title, content, ai_items[:20], football_results, github_projects)
     save_to_wiki(title, content)
 
     print(f"\n✓ Digest gotowy!\n")
