@@ -136,9 +136,27 @@ Napisz zwięzły, czytelny artykuł PO POLSKU w formacie Markdown:
 
 Styl: profesjonalny ale przystępny. Tłumacz tytuły i terminy na polski. Bądź konkretny, nie lej wody."""
 
+def list_gemini_models():
+    """Zwraca listę dostępnych modeli Gemini."""
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+        raw = fetch_url(url)
+        data = json.loads(raw)
+        names = [m["name"].replace("models/", "") for m in data.get("models", [])
+                 if "generateContent" in m.get("supportedGenerationMethods", [])]
+        print(f"  [Gemini] Dostępne modele: {names[:8]}")
+        return names
+    except Exception as e:
+        print(f"  [Gemini] Nie można pobrać listy modeli: {e}", file=sys.stderr)
+        return []
+
 def call_gemini(prompt):
-    # Próbuj modele od najnowszego
-    models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest"]
+    # Pobierz dostępne modele, preferuj flash
+    available = list_gemini_models()
+    preferred = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash",
+                 "gemini-2.5-pro", "gemini-2.0-pro"]
+    models = [m for m in preferred if m in available] or available[:3] or preferred
+
     last_err = None
     for model in models:
         url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
@@ -151,12 +169,13 @@ def call_gemini(prompt):
             req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=60) as r:
                 data = json.loads(r.read())
-            print(f"  [Gemini] Model: {model}")
+            print(f"  [Gemini] Użyto modelu: {model}")
             return data["candidates"][0]["content"]["parts"][0]["text"]
         except urllib.error.HTTPError as e:
-            print(f"  [Gemini] {model}: HTTP {e.code}", file=sys.stderr)
+            body_err = e.read().decode("utf-8", errors="replace")[:300]
+            print(f"  [Gemini] {model}: HTTP {e.code} — {body_err}", file=sys.stderr)
             last_err = e
-    raise last_err
+    raise RuntimeError(f"Gemini: wszystkie modele zawiodły. Ostatni błąd: {last_err}")
 
 def save_to_supabase(title, content, ai_items, football_results):
     body = json.dumps({
@@ -178,8 +197,13 @@ def save_to_supabase(title, content, ai_items, football_results):
             "Prefer": "return=minimal"
         }
     )
-    with urllib.request.urlopen(req, timeout=15) as r:
-        print(f"  [Supabase] Status: {r.status}")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            print(f"  [Supabase] Status: {r.status}")
+    except urllib.error.HTTPError as e:
+        body_err = e.read().decode("utf-8", errors="replace")[:500]
+        print(f"  [Supabase] HTTP {e.code}: {body_err}", file=sys.stderr)
+        raise
 
 def save_to_wiki(title, content):
     os.makedirs(WIKI_DIR, exist_ok=True)
