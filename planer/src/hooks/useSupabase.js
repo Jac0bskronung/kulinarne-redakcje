@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { db } from '@/lib/supabase';
 
 export const useSupabase = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Pobierz wydatki mieszkaniowe (housing expenses monthly data)
-  const fetchHousingExpenses = async () => {
+  const fetchHousingExpenses = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -24,10 +23,9 @@ export const useSupabase = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Pobierz wydatki z życia (living expenses)
-  const fetchLivingExpenses = async () => {
+  const fetchLivingExpenses = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -45,10 +43,9 @@ export const useSupabase = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Pobierz wiadomości AI (AI news)
-  const fetchAiNews = async () => {
+  const fetchAiNews = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -66,10 +63,9 @@ export const useSupabase = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Pobierz kategorie wydatków (expense categories)
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -86,7 +82,7 @@ export const useSupabase = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   return {
     db,
