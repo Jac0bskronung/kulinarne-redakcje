@@ -1,0 +1,165 @@
+/* ===== NOISE OVERLAY ===== */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+/* ===== GLASS HEADER ===== */
+.glass-header {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* ===== TAB INDICATOR ===== */
+.tab-indicator {
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ===== CARD STYLES ===== */
+.expense-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.expense-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-hover);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* ===== STAT GLOW ===== */
+.stat-glow-green {
+  box-shadow: 0 0 40px rgba(16, 185, 129, 0.08), inset 0 1px 0 rgba(16, 185, 129, 0.1);
+}
+.stat-glow-red {
+  box-shadow: 0 0 40px rgba(244, 63, 94, 0.08), inset 0 1px 0 rgba(244, 63, 94, 0.1);
+}
+.stat-glow-blue {
+  box-shadow: 0 0 40px rgba(59, 130, 246, 0.08), inset 0 1px 0 rgba(59, 130, 246, 0.1);
+}
+
+/* ===== GRADIENT ACCENTS ===== */
+.accent-line-green {
+  background: linear-gradient(90deg, #10B981, #34D399, transparent);
+  height: 1px;
+}
+.accent-line-red {
+  background: linear-gradient(90deg, #F43F5E, #FB7185, transparent);
+  height: 1px;
+}
+.accent-line-blue {
+  background: linear-gradient(90deg, #3B82F6, #60A5FA, transparent);
+  height: 1px;
+}
+
+/* ===== PULSE DOT ===== */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.5); }
+}
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* ===== SHIMMER ===== */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.03) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+/* Tailwind shimmer keyframe for skeleton loader */
+@keyframes shimmer-tw {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ===== NEWS CARD IMAGE HOVER ===== */
+.news-image-wrap {
+  overflow: hidden;
+  border-radius: 8px;
+}
+.news-image-wrap img {
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.news-image-wrap:hover img {
+  transform: scale(1.05);
+}
+
+/* ===== STAGGERED ENTRANCE ===== */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.stagger-enter {
+  animation: fade-in-up 0.5s ease-out forwards;
+  opacity: 0;
+}
+.stagger-enter:nth-child(1) { animation-delay: 0.05s; }
+.stagger-enter:nth-child(2) { animation-delay: 0.1s; }
+.stagger-enter:nth-child(3) { animation-delay: 0.15s; }
+.stagger-enter:nth-child(4) { animation-delay: 0.2s; }
+.stagger-enter:nth-child(5) { animation-delay: 0.25s; }
+.stagger-enter:nth-child(6) { animation-delay: 0.3s; }
+
+/* ===== CHART TOOLTIP ===== */
+.custom-tooltip {
+  background: var(--bg-elevated) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important;
+}
+.custom-tooltip .label {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.custom-tooltip .value {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+/* ===== SKELETON SHIMMER ===== */
+.skeleton-shimmer {
+  background: #1E2532;
+  position: relative;
+  overflow: hidden;
+}
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 40%, rgba(255,255,255,0.04) 60%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* ===== NUMBER COUNTER ===== */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.count-animate {
+  animation: count-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
