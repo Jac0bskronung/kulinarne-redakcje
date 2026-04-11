@@ -1,9 +1,8 @@
-name: Build and Deploy to Vercel
+name: Build and Deploy to Vercel (manual fallback)
 
+# Disabled automatic push trigger — Vercel native Git integration now handles deployments.
+# Kept as manual fallback only. Trigger via GitHub Actions UI → "Run workflow".
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
