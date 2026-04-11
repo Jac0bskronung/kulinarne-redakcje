@@ -177,7 +177,7 @@ export const AiNews = () => {
       }
     };
     loadNews();
-  }, []);
+  }, [fetchAiNews]);
 
   if (loading) return <TabSkeleton />;
   if (error) return <div className="text-red-400 p-6">Błąd ładowania wiadomości: {error}</div>;

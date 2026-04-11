@@ -91,7 +91,7 @@ export const LivingExpenses = () => {
       }
     };
     loadData();
-  }, []);
+  }, [fetchLivingExpenses]);
 
   if (loading) return <TabSkeleton />;
   if (error) return <div className="text-red-400 p-6">Błąd ładowania danych: {error}</div>;
