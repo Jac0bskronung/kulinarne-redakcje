@@ -25,18 +25,28 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Build application
+      - name: Install Vercel CLI
+        run: npm install -g vercel@32
+
+      - name: Pull Vercel project settings
         working-directory: ./planer
-        run: npm run build
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
         env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Build with Vercel (uses GitHub secrets for env vars)
+        working-directory: ./planer
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           REACT_APP_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
-      - name: Deploy to Vercel
+      - name: Deploy prebuilt output to Vercel
         working-directory: ./planer
-        run: |
-          npm install -g vercel@32
-          vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes --cwd .
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
