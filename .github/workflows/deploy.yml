@@ -20,17 +20,20 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
+        working-directory: ./planer
         run: npm install
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Build application
+        working-directory: ./planer
         run: npm run build
         env:
           REACT_APP_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
       - name: Deploy to Vercel
+        working-directory: ./planer
         run: |
           npm install -g vercel
           vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --confirm
