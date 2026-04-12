@@ -10,7 +10,7 @@
  * @param {Array} rooms - [{id, name, icon, sort_order}]
  * @param {Array} expenseTypes - [{id, name, icon, sort_order}]
  * @param {Array} keywordHints - [{id, keyword, room_id, expense_type_id, priority}]
- * @returns {{ name: string, estimated_amount: number|null, room_id: string|null, expense_type_id: string|null, confidence: number, status: string, source_text: string }}
+ * @returns {{ name: string, estimated_amount: number|null, room_id: string|null, expense_type_id: string|null, confidence: number, status: string, source_text: string, source_url: string|null }}
  */
 export function budgetParser(text, rooms, expenseTypes, keywordHints) {
   const original = text.trim();
@@ -23,26 +23,41 @@ export function budgetParser(text, rooms, expenseTypes, keywordHints) {
       confidence: 0,
       status: 'needs_review',
       source_text: original,
+      source_url: null,
     };
   }
 
-  // --- 1. Extract amount ---
-  const { amount, textWithoutAmount } = extractAmount(original);
+  // --- 0. Extract URL if present ---
+  const { url, textWithoutUrl } = extractUrl(original);
 
-  // --- 2. Build name (everything that's not the amount) ---
-  const name = textWithoutAmount.replace(/\s+/g, ' ').trim();
+  // --- 1. Extract amount ---
+  const { amount, textWithoutAmount } = extractAmount(textWithoutUrl);
+
+  // --- 2. Build name (everything that's not the amount or URL) ---
+  let name = textWithoutAmount.replace(/\s+/g, ' ').trim();
+
+  // If only a URL was sent (no other text), use domain as name
+  if (!name && url) {
+    name = extractDomain(url);
+  }
 
   // --- 3. Match keywords ---
-  const lowerText = original.toLowerCase();
+  const lowerText = textWithoutUrl.toLowerCase();
   const { roomId, expenseTypeId } = matchKeywords(lowerText, keywordHints);
 
-  // --- 4. Confidence ---
+  // --- 4. Confidence & status ---
   let confidence = 0;
   if (amount != null) confidence += 0.3;
   if (roomId != null) confidence += 0.35;
   if (expenseTypeId != null) confidence += 0.35;
 
-  const status = confidence >= 0.65 ? 'planned' : 'needs_review';
+  // URLs default to inspiration status, regardless of confidence
+  let status;
+  if (url) {
+    status = 'inspiration';
+  } else {
+    status = confidence >= 0.65 ? 'planned' : 'needs_review';
+  }
 
   return {
     name: name || original,
@@ -52,7 +67,35 @@ export function budgetParser(text, rooms, expenseTypes, keywordHints) {
     confidence: Math.round(confidence * 100) / 100,
     status,
     source_text: original,
+    source_url: url,
   };
+}
+
+/**
+ * Extract a URL from the text and return the remaining text.
+ */
+function extractUrl(text) {
+  const urlPattern = /https?:\/\/[^\s]+/i;
+  const match = text.match(urlPattern);
+  if (match) {
+    const url = match[0];
+    const textWithoutUrl = text.replace(url, '').trim();
+    return { url, textWithoutUrl };
+  }
+  return { url: null, textWithoutUrl: text };
+}
+
+/**
+ * Extract domain name from a URL (e.g. "https://www.ikea.com/path" → "ikea.com")
+ */
+function extractDomain(url) {
+  try {
+    const hostname = new URL(url).hostname;
+    // Remove "www." prefix
+    return hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
 }
 
 /**

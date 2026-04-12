@@ -6,6 +6,7 @@ import {
   Hammer, Plus, X, Pencil, Trash2, ChevronRight,
   Wallet, Snowflake, PiggyBank, CircleDollarSign,
   ExternalLink, Check, AlertTriangle, Send, Loader2,
+  Lightbulb, Link2, ArrowRight, Bookmark,
 } from 'lucide-react';
 import { budgetParser } from '@/lib/budgetParser';
 
@@ -162,17 +163,49 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+// ─── Lifecycle Indicator ──────────────────────────────────────
+const LIFECYCLE_STEPS = [
+  { status: 'inspiration', emoji: '\u{1F4A1}', label: 'Inspiracja' },
+  { status: 'planned',     emoji: '\u{1F4CB}', label: 'Planowany' },
+  { status: 'realized',    emoji: '\u{2705}',   label: 'Kupiony' },
+];
+
+const LifecycleIndicator = ({ currentStatus }) => {
+  const currentIdx = LIFECYCLE_STEPS.findIndex(s => s.status === currentStatus);
+  return (
+    <div className="flex items-center gap-0.5 text-[10px]">
+      {LIFECYCLE_STEPS.map((step, idx) => {
+        const isActive = idx <= currentIdx && currentIdx >= 0;
+        const isCurrent = step.status === currentStatus;
+        return (
+          <span key={step.status} className="flex items-center gap-0.5">
+            {idx > 0 && <ArrowRight className={`w-2.5 h-2.5 ${isActive ? 'text-amber-500/60' : 'text-[#475569]/40'}`} />}
+            <span className={`${isCurrent ? 'text-amber-400 font-semibold' : isActive ? 'text-[#94A3B8]' : 'text-[#475569]/50'}`}>
+              {step.emoji}
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
 // ─── Item Row ──────────────────────────────────────────────────
-const ItemRow = ({ item, rooms, expenseTypes, onEdit, onDelete, onStatusChange }) => {
+const ItemRow = ({ item, rooms, expenseTypes, onEdit, onDelete, onStatusChange, isHighlighted }) => {
   const room = rooms.find(r => r.id === item.room_id);
   const type = expenseTypes.find(t => t.id === item.expense_type_id);
   const amount = item.status === 'realized' && item.final_amount != null ? item.final_amount : item.estimated_amount;
   const nextStatus = NEXT_STATUS[item.status];
+  const nextLabel = nextStatus ? STATUS_CONFIG[nextStatus]?.label : null;
 
   return (
     <motion.div
       initial={{ opacity: 0, x: -12 }}
-      animate={{ opacity: 1, x: 0 }}
+      animate={{
+        opacity: 1,
+        x: 0,
+        backgroundColor: isHighlighted ? 'rgba(245, 158, 11, 0.08)' : 'rgba(0,0,0,0)',
+      }}
       exit={{ opacity: 0, x: 12 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ x: 4, transition: { duration: 0.2 } }}
@@ -181,7 +214,7 @@ const ItemRow = ({ item, rooms, expenseTypes, onEdit, onDelete, onStatusChange }
     >
       {/* Room icon */}
       <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5 flex-shrink-0 text-lg">
-        {room?.icon || '🏠'}
+        {room?.icon || '\u{1F3E0}'}
       </div>
 
       {/* Info */}
@@ -189,8 +222,26 @@ const ItemRow = ({ item, rooms, expenseTypes, onEdit, onDelete, onStatusChange }
         <p className="text-sm font-medium text-[#F8FAFC] truncate">{item.name}</p>
         <div className="flex items-center gap-2 mt-1 flex-wrap">
           {room && <span className="text-xs text-[#475569]">{room.icon} {room.name}</span>}
-          {type && <span className="text-xs text-[#475569]">· {type.icon} {type.name}</span>}
+          {type && <span className="text-xs text-[#475569]">&middot; {type.icon} {type.name}</span>}
+          {item.source_url && (
+            <a
+              href={item.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Link2 className="w-3 h-3" />
+              {(() => { try { return new URL(item.source_url).hostname.replace(/^www\./, ''); } catch { return 'link'; } })()}
+            </a>
+          )}
         </div>
+        {/* Lifecycle indicator */}
+        {item.status !== 'needs_review' && (
+          <div className="mt-1">
+            <LifecycleIndicator currentStatus={item.status} />
+          </div>
+        )}
       </div>
 
       {/* Status badge */}
@@ -206,11 +257,15 @@ const ItemRow = ({ item, rooms, expenseTypes, onEdit, onDelete, onStatusChange }
         {nextStatus && (
           <button
             onClick={(e) => { e.stopPropagation(); onStatusChange(item); }}
-            className="p-1.5 rounded hover:bg-amber-500/10 text-amber-400"
-            title="Zmień status"
+            className="relative p-1.5 rounded hover:bg-amber-500/10 text-amber-400 group/advance"
+            title={`Przenie\u015B do: ${nextLabel}`}
             data-testid={`status-advance-${item.id}`}
           >
             <ChevronRight className="w-4 h-4" />
+            {/* Tooltip */}
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded text-[10px] font-medium bg-[#0B0E14] border border-white/10 text-[#F8FAFC] whitespace-nowrap opacity-0 group-hover/advance:opacity-100 transition-opacity pointer-events-none">
+              Przenie\u015B do: {nextLabel}
+            </span>
           </button>
         )}
         <button
@@ -224,7 +279,7 @@ const ItemRow = ({ item, rooms, expenseTypes, onEdit, onDelete, onStatusChange }
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(item); }}
           className="p-1.5 rounded hover:bg-rose-500/10 text-rose-400"
-          title="Usuń"
+          title="Usu\u0144"
           data-testid={`delete-item-${item.id}`}
         >
           <Trash2 className="w-3.5 h-3.5" />
@@ -477,6 +532,191 @@ const FinalAmountPopup = ({ isOpen, onClose, onConfirm, item }) => {
   );
 };
 
+// ─── Estimated Amount Popup (inspiration → planned) ───────────
+const EstimatedAmountPopup = ({ isOpen, onClose, onConfirm, item }) => {
+  const [amount, setAmount] = useState('');
+
+  useEffect(() => {
+    if (item) setAmount('');
+  }, [item]);
+
+  if (!isOpen || !item) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          className="relative w-full max-w-sm bg-[#151A23] border border-white/10 rounded-xl shadow-2xl p-5"
+          data-testid="estimated-amount-popup"
+        >
+          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-2">Szacowana kwota</h3>
+          <p className="text-sm text-[#94A3B8] mb-4">
+            Podaj szacowan{'\u0105'} kwot{'\u0119'} za <span className="text-violet-400 font-medium">{item.name}</span> aby zaplanowa{'\u0107'}:
+          </p>
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="w-full bg-[#0B0E14] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-[#F8FAFC] focus:outline-none focus:ring-1 focus:ring-violet-500 mb-4"
+            autoFocus
+            min="0"
+            step="0.01"
+            placeholder="Kwota w z\u0142"
+            data-testid="estimated-amount-input"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2 rounded-lg border border-white/10 text-[#94A3B8] text-sm hover:bg-white/5 transition-colors"
+              data-testid="estimated-amount-cancel"
+            >
+              Anuluj
+            </button>
+            <button
+              onClick={() => { onConfirm(parseFloat(amount) || 0); }}
+              disabled={!amount || parseFloat(amount) <= 0}
+              className="flex-1 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm transition-colors"
+              data-testid="estimated-amount-confirm"
+            >
+              Zaplanuj
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
+// ─── Inspiration Shelf ────────────────────────────────────────
+const InspirationShelf = ({ items, rooms, expenseTypes, onPlan, onDelete }) => {
+  const inspirations = items.filter(i => i.status === 'inspiration');
+
+  if (inspirations.length === 0) return null;
+
+  const withLink = inspirations.filter(i => i.source_url);
+  const totalEstimated = inspirations.reduce((s, i) => s + (i.estimated_amount ?? 0), 0);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.3 }}
+      className="expense-card p-6 border-violet-500/20"
+      data-testid="inspiration-shelf"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="bg-violet-500/10 border border-violet-500/20 rounded-lg p-2.5">
+            <Bookmark className="w-5 h-5 text-violet-400" strokeWidth={1.5} />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-[#F8FAFC]">Schowek na inspiracje</h3>
+            <div className="flex items-center gap-3 mt-0.5">
+              <span className="text-xs text-[#94A3B8]">{inspirations.length} inspiracji</span>
+              {withLink.length > 0 && (
+                <span className="text-xs text-violet-400">{withLink.length} z linkiem</span>
+              )}
+              {totalEstimated > 0 && (
+                <span className="text-xs text-[#94A3B8]">{'\u2248'} {fmt(totalEstimated)} z{'\u0142'}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Card Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <AnimatePresence mode="popLayout">
+          {inspirations.map(item => {
+            const room = rooms.find(r => r.id === item.room_id);
+            const type = expenseTypes.find(t => t.id === item.expense_type_id);
+            let domain = null;
+            if (item.source_url) {
+              try { domain = new URL(item.source_url).hostname.replace(/^www\./, ''); } catch { domain = 'link'; }
+            }
+
+            return (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                className="rounded-lg bg-[#0B0E14] border border-violet-500/15 hover:border-violet-500/30 p-4 flex flex-col gap-3 transition-colors duration-200"
+                data-testid={`inspiration-card-${item.id}`}
+              >
+                {/* Name */}
+                <p className="text-sm font-medium text-[#F8FAFC] truncate">{item.name}</p>
+
+                {/* URL link */}
+                {domain && (
+                  <a
+                    href={item.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-violet-400 hover:text-violet-300 truncate"
+                  >
+                    <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                    {domain}
+                  </a>
+                )}
+
+                {/* Badges */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {room && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-violet-500/10 text-violet-300 border border-violet-500/20">
+                      {room.icon} {room.name}
+                    </span>
+                  )}
+                  {type && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-violet-500/10 text-violet-300 border border-violet-500/20">
+                      {type.icon} {type.name}
+                    </span>
+                  )}
+                </div>
+
+                {/* Amount */}
+                {item.estimated_amount != null && item.estimated_amount > 0 && (
+                  <p className="text-xs text-[#94A3B8]">{'\u2248'} {fmt(item.estimated_amount)} z{'\u0142'}</p>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2 mt-auto pt-1">
+                  <button
+                    onClick={() => onPlan(item)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-violet-500/15 hover:bg-violet-500/25 text-violet-400 text-xs font-medium transition-colors border border-violet-500/20"
+                    data-testid={`plan-inspiration-${item.id}`}
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                    Zaplanuj
+                  </button>
+                  <button
+                    onClick={() => onDelete(item)}
+                    className="px-3 py-1.5 rounded-lg hover:bg-rose-500/10 text-rose-400/60 hover:text-rose-400 text-xs transition-colors"
+                    data-testid={`delete-inspiration-${item.id}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+};
+
 // ─── Delete Confirmation ───────────────────────────────────────
 const DeleteConfirm = ({ isOpen, onClose, onConfirm, itemName }) => {
   if (!isOpen) return null;
@@ -536,13 +776,16 @@ const BotInput = ({ rooms, expenseTypes, keywordHints, onItemAdded }) => {
         status: parsed.status,
         confidence: parsed.confidence,
         source_text: parsed.source_text,
+        source_url: parsed.source_url,
       });
 
       if (created) {
         const room = rooms.find(r => r.id === parsed.room_id);
         const type = expenseTypes.find(t => t.id === parsed.expense_type_id);
 
-        if (parsed.confidence >= 0.65) {
+        if (parsed.source_url) {
+          setToast({ type: 'success', message: `Dodano inspirację: ${parsed.name}` });
+        } else if (parsed.confidence >= 0.65) {
           const parts = [`Dodano: ${parsed.name}`];
           if (parsed.estimated_amount != null) parts.push(`${fmt(parsed.estimated_amount)} zł`);
           if (room) parts.push(`${room.icon} ${room.name}`);
@@ -582,7 +825,7 @@ const BotInput = ({ rooms, expenseTypes, keywordHints, onItemAdded }) => {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-            placeholder="Wpisz wydatek, np. 'Płytki łazienka 1500' lub 'Castorama śruby 150'"
+            placeholder="Wpisz wydatek, np. 'Płytki łazienka 1500' lub wklej link do inspiracji"
             className="flex-1 bg-[#0B0E14] border border-white/10 rounded-lg px-4 py-3 text-sm text-[#F8FAFC] placeholder-[#475569] focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500/50"
             disabled={sending}
             data-testid="bot-text-input"
@@ -653,6 +896,8 @@ export const RemontBudget = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [deletingItem, setDeletingItem] = useState(null);
   const [statusChangeItem, setStatusChangeItem] = useState(null);
+  const [estimatedAmountItem, setEstimatedAmountItem] = useState(null);
+  const [highlightedItemId, setHighlightedItemId] = useState(null);
 
   // ─── Load data ──────
   const loadAll = useCallback(async () => {
@@ -727,9 +972,21 @@ export const RemontBudget = () => {
     // planned → realized needs final amount popup
     if (item.status === 'planned' && next === 'realized') {
       setStatusChangeItem(item);
+    } else if (item.status === 'inspiration' && next === 'planned' && item.estimated_amount == null) {
+      // inspiration → planned needs estimated amount if missing
+      setEstimatedAmountItem(item);
     } else {
       // Direct status change
       advanceStatus(item, next, null);
+    }
+  };
+
+  // Plan inspiration (from shelf or list)
+  const handlePlanInspiration = (item) => {
+    if (item.estimated_amount == null) {
+      setEstimatedAmountItem(item);
+    } else {
+      advanceStatus(item, 'planned', null);
     }
   };
 
@@ -737,7 +994,12 @@ export const RemontBudget = () => {
     const changes = { status: newStatus };
     if (finalAmount != null) changes.final_amount = finalAmount;
     const updated = await updateItem(item.id, changes);
-    if (updated) setItems(prev => prev.map(i => i.id === item.id ? updated : i));
+    if (updated) {
+      setItems(prev => prev.map(i => i.id === item.id ? updated : i));
+      // Flash highlight
+      setHighlightedItemId(updated.id);
+      setTimeout(() => setHighlightedItemId(null), 1500);
+    }
   };
 
   const handleFinalAmountConfirm = (amount) => {
@@ -745,6 +1007,19 @@ export const RemontBudget = () => {
       advanceStatus(statusChangeItem, 'realized', amount);
     }
     setStatusChangeItem(null);
+  };
+
+  const handleEstimatedAmountConfirm = async (amount) => {
+    if (estimatedAmountItem) {
+      const changes = { status: 'planned', estimated_amount: amount };
+      const updated = await updateItem(estimatedAmountItem.id, changes);
+      if (updated) {
+        setItems(prev => prev.map(i => i.id === estimatedAmountItem.id ? updated : i));
+        setHighlightedItemId(updated.id);
+        setTimeout(() => setHighlightedItemId(null), 1500);
+      }
+    }
+    setEstimatedAmountItem(null);
   };
 
   if (isLoading) return <TabSkeleton />;
@@ -871,12 +1146,22 @@ export const RemontBudget = () => {
                   onEdit={(it) => { setEditingItem(it); setShowForm(true); }}
                   onDelete={(it) => setDeletingItem(it)}
                   onStatusChange={handleStatusChange}
+                  isHighlighted={highlightedItemId === item.id}
                 />
               ))
             )}
           </AnimatePresence>
         </div>
       </motion.div>
+
+      {/* B2) Inspiration Shelf */}
+      <InspirationShelf
+        items={items}
+        rooms={rooms}
+        expenseTypes={expenseTypes}
+        onPlan={handlePlanInspiration}
+        onDelete={(it) => setDeletingItem(it)}
+      />
 
       {/* C) Quick-add / Edit Modal */}
       <ItemFormModal
@@ -894,6 +1179,14 @@ export const RemontBudget = () => {
         onClose={() => setStatusChangeItem(null)}
         onConfirm={handleFinalAmountConfirm}
         item={statusChangeItem}
+      />
+
+      {/* Estimated amount popup (inspiration → planned) */}
+      <EstimatedAmountPopup
+        isOpen={!!estimatedAmountItem}
+        onClose={() => setEstimatedAmountItem(null)}
+        onConfirm={handleEstimatedAmountConfirm}
+        item={estimatedAmountItem}
       />
 
       {/* Delete confirmation */}
