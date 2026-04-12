@@ -48,13 +48,21 @@ export const useSupabase = () => {
   const fetchAiNews = useCallback(async () => {
     try {
       const { data, error: err } = await db
-        .from('ai_news')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(12);
+        .from('digests')
+        .select('ai_items, date')
+        .order('date', { ascending: false })
+        .limit(1);
 
-      if (err) return [];
-      return data || [];
+      if (err || !data || data.length === 0) return [];
+
+      const items = data[0].ai_items || [];
+      // Deduplicate by link
+      const seen = new Set();
+      return items.filter(item => {
+        if (seen.has(item.link)) return false;
+        seen.add(item.link);
+        return true;
+      });
     } catch {
       return [];
     }
