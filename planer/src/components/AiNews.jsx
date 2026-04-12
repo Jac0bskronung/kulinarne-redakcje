@@ -155,8 +155,9 @@ const CompactNewsCard = ({ item, delay }) => {
 };
 
 export const AiNews = () => {
-  const { fetchAiNews, loading, error } = useSupabase();
+  const { fetchAiNews } = useSupabase();
   const [newsItems, setNewsItems] = useState(DEFAULT_NEWS_ITEMS);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadNews = async () => {
@@ -175,12 +176,12 @@ export const AiNews = () => {
           }))
         );
       }
+      setIsLoading(false);
     };
     loadNews();
   }, [fetchAiNews]);
 
-  if (loading) return <TabSkeleton />;
-  if (error) return <div className="text-red-400 p-6">Błąd ładowania wiadomości: {error}</div>;
+  if (isLoading) return <TabSkeleton />;
 
   const featured = newsItems.filter(n => n.image);
   const compact = newsItems.filter(n => !n.image);

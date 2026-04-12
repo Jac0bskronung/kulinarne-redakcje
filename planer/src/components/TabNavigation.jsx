@@ -1,9 +1,8 @@
 import { motion } from 'framer-motion';
-import { Home, Heart, Cpu } from 'lucide-react';
+import { Home, Cpu } from 'lucide-react';
 
 const tabs = [
   { id: 'housing', label: 'Mieszkanie', icon: Home, color: '#10B981' },
-  { id: 'living', label: 'Koszty Życia', icon: Heart, color: '#F43F5E' },
   { id: 'ai-news', label: 'Wiadomości AI', icon: Cpu, color: '#3B82F6' },
 ];
 

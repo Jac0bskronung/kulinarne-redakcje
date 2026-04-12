@@ -2,14 +2,12 @@ import { useState, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { TabNavigation } from './TabNavigation';
 import { HousingExpenses } from './HousingExpenses';
-import { LivingExpenses } from './LivingExpenses';
 import { AiNews } from './AiNews';
 import { TabTransition } from './TabTransition';
 import { Calendar, Bell } from 'lucide-react';
 
 const tabContent = {
   'housing': HousingExpenses,
-  'living': LivingExpenses,
   'ai-news': AiNews,
 };
 

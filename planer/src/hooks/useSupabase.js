@@ -46,8 +46,6 @@ export const useSupabase = () => {
   }, []);
 
   const fetchAiNews = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
       const { data, error: err } = await db
         .from('ai_news')
@@ -55,13 +53,10 @@ export const useSupabase = () => {
         .order('created_at', { ascending: false })
         .limit(12);
 
-      if (err) throw err;
+      if (err) return [];
       return data || [];
-    } catch (err) {
-      setError(err.message);
+    } catch {
       return [];
-    } finally {
-      setLoading(false);
     }
   }, []);
 
