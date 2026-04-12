@@ -5,8 +5,9 @@ import { TabSkeleton } from './TabSkeleton';
 import {
   Hammer, Plus, X, Pencil, Trash2, ChevronRight,
   Wallet, Snowflake, PiggyBank, CircleDollarSign,
-  ExternalLink, Check, AlertTriangle,
+  ExternalLink, Check, AlertTriangle, Send, Loader2,
 } from 'lucide-react';
+import { budgetParser } from '@/lib/budgetParser';
 
 const STATUS_CONFIG = {
   inspiration: { label: 'Inspiracja', emoji: '\u{1F4A1}', bg: 'bg-violet-500/15', text: 'text-violet-400', border: 'border-violet-500/30' },
@@ -514,13 +515,123 @@ const DeleteConfirm = ({ isOpen, onClose, onConfirm, itemName }) => {
   );
 };
 
+// ─── Bot Input ────────────────────────────────────────────────
+const BotInput = ({ rooms, expenseTypes, keywordHints, onItemAdded }) => {
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [toast, setToast] = useState(null); // { type: 'success'|'warning', message: string }
+
+  const handleSubmit = async () => {
+    const trimmed = text.trim();
+    if (!trimmed || sending) return;
+
+    setSending(true);
+    try {
+      const parsed = budgetParser(trimmed, rooms, expenseTypes, keywordHints);
+      const created = await onItemAdded({
+        name: parsed.name,
+        estimated_amount: parsed.estimated_amount,
+        room_id: parsed.room_id,
+        expense_type_id: parsed.expense_type_id,
+        status: parsed.status,
+        confidence: parsed.confidence,
+        source_text: parsed.source_text,
+      });
+
+      if (created) {
+        const room = rooms.find(r => r.id === parsed.room_id);
+        const type = expenseTypes.find(t => t.id === parsed.expense_type_id);
+
+        if (parsed.confidence >= 0.65) {
+          const parts = [`Dodano: ${parsed.name}`];
+          if (parsed.estimated_amount != null) parts.push(`${fmt(parsed.estimated_amount)} zł`);
+          if (room) parts.push(`${room.icon} ${room.name}`);
+          if (type) parts.push(`${type.icon} ${type.name}`);
+          setToast({ type: 'success', message: parts.join(' — ') });
+        } else {
+          const parts = [`Dodano do weryfikacji: ${parsed.name}`];
+          if (parsed.estimated_amount == null) parts.push('brak kwoty');
+          setToast({ type: 'warning', message: parts.join(' — ') });
+        }
+        setText('');
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Auto-hide toast
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="space-y-2"
+      data-testid="bot-input-section"
+    >
+      <div className="expense-card p-4">
+        <p className="text-xs uppercase tracking-[0.15em] text-[#475569] font-medium mb-3">Szybkie dodawanie</p>
+        <div className="flex gap-2">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+            placeholder="Wpisz wydatek, np. 'Płytki łazienka 1500' lub 'Castorama śruby 150'"
+            className="flex-1 bg-[#0B0E14] border border-white/10 rounded-lg px-4 py-3 text-sm text-[#F8FAFC] placeholder-[#475569] focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500/50"
+            disabled={sending}
+            data-testid="bot-text-input"
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={sending || !text.trim()}
+            className="px-4 py-3 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-[#0B0E14] font-semibold text-sm transition-colors duration-200 flex items-center gap-2"
+            data-testid="bot-send-btn"
+          >
+            {sending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Toast notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -8, height: 0 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className={`rounded-lg px-4 py-3 text-sm font-medium border ${
+              toast.type === 'success'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+            }`}
+            data-testid="bot-toast"
+          >
+            {toast.type === 'success' ? '\u2705 ' : '\u26A0\uFE0F '}{toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
 // ═══════════════════════════════════════════════════════════════
 // ─── MAIN COMPONENT ──────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════
 export const RemontBudget = () => {
   const {
     fetchBudgetConfig, updateBudgetConfig,
-    fetchRooms, fetchExpenseTypes,
+    fetchRooms, fetchExpenseTypes, fetchKeywordHints,
     fetchItems, createItem, updateItem, deleteItem,
     ensureAuth,
   } = useSupabase();
@@ -529,6 +640,7 @@ export const RemontBudget = () => {
   const [budgetConfig, setBudgetConfig] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [expenseTypes, setExpenseTypes] = useState([]);
+  const [keywordHints, setKeywordHints] = useState([]);
   const [items, setItems] = useState([]);
 
   // Filters
@@ -545,15 +657,16 @@ export const RemontBudget = () => {
   // ─── Load data ──────
   const loadAll = useCallback(async () => {
     await ensureAuth();
-    const [cfg, r, et, it] = await Promise.all([
-      fetchBudgetConfig(), fetchRooms(), fetchExpenseTypes(), fetchItems(),
+    const [cfg, r, et, kh, it] = await Promise.all([
+      fetchBudgetConfig(), fetchRooms(), fetchExpenseTypes(), fetchKeywordHints(), fetchItems(),
     ]);
     setBudgetConfig(cfg);
     setRooms(r);
     setExpenseTypes(et);
+    setKeywordHints(kh);
     setItems(it);
     setIsLoading(false);
-  }, [ensureAuth, fetchBudgetConfig, fetchRooms, fetchExpenseTypes, fetchItems]);
+  }, [ensureAuth, fetchBudgetConfig, fetchRooms, fetchExpenseTypes, fetchKeywordHints, fetchItems]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -578,6 +691,12 @@ export const RemontBudget = () => {
   }, [items, statusFilter, roomFilter, typeFilter]);
 
   // ─── Handlers ──────
+  const handleBotAdd = async (itemData) => {
+    const created = await createItem(itemData);
+    if (created) setItems(prev => [created, ...prev]);
+    return created;
+  };
+
   const handleEditBudget = async (val) => {
     await updateBudgetConfig(val);
     setBudgetConfig(prev => ({ ...prev, total_budget: val }));
@@ -650,6 +769,14 @@ export const RemontBudget = () => {
         </div>
       </div>
       <div className="accent-line-amber" />
+
+      {/* Bot Input */}
+      <BotInput
+        rooms={rooms}
+        expenseTypes={expenseTypes}
+        keywordHints={keywordHints}
+        onItemAdded={handleBotAdd}
+      />
 
       {/* A) Fear Bar */}
       <FearBar budget={budget} spent={spent} frozen={frozen} onEditBudget={handleEditBudget} />

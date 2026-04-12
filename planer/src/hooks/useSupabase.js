@@ -162,6 +162,20 @@ export const useSupabase = () => {
     }
   }, []);
 
+  const fetchKeywordHints = useCallback(async () => {
+    try {
+      const { data, error: err } = await db
+        .from('keyword_hints')
+        .select('*')
+        .order('priority', { ascending: false });
+      if (err) throw err;
+      return data || [];
+    } catch (err) {
+      setError(err.message);
+      return [];
+    }
+  }, []);
+
   const fetchItems = useCallback(async () => {
     try {
       const { data, error: err } = await db
@@ -233,6 +247,7 @@ export const useSupabase = () => {
     updateBudgetConfig,
     fetchRooms,
     fetchExpenseTypes,
+    fetchKeywordHints,
     fetchItems,
     createItem,
     updateItem,
