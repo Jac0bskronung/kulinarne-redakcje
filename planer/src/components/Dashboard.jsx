@@ -3,12 +3,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { TabNavigation } from './TabNavigation';
 import { HousingExpenses } from './HousingExpenses';
 import { AiNews } from './AiNews';
+import { RemontBudget } from './RemontBudget';
 import { TabTransition } from './TabTransition';
 import { Calendar, Bell } from 'lucide-react';
 
 const tabContent = {
   'housing': HousingExpenses,
   'ai-news': AiNews,
+  'remont': RemontBudget,
 };
 
 export const Dashboard = () => {

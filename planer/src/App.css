@@ -47,6 +47,9 @@
 .stat-glow-blue {
   box-shadow: 0 0 40px rgba(59, 130, 246, 0.08), inset 0 1px 0 rgba(59, 130, 246, 0.1);
 }
+.stat-glow-amber {
+  box-shadow: 0 0 40px rgba(245, 158, 11, 0.08), inset 0 1px 0 rgba(245, 158, 11, 0.1);
+}
 
 /* ===== GRADIENT ACCENTS ===== */
 .accent-line-green {
@@ -59,6 +62,10 @@
 }
 .accent-line-blue {
   background: linear-gradient(90deg, #3B82F6, #60A5FA, transparent);
+  height: 1px;
+}
+.accent-line-amber {
+  background: linear-gradient(90deg, #F59E0B, #FBBF24, transparent);
   height: 1px;
 }
 
@@ -162,4 +169,13 @@
 }
 .count-animate {
   animation: count-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ===== FEAR BAR PULSE ===== */
+@keyframes fear-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+  50% { box-shadow: 0 0 20px 4px rgba(244, 63, 94, 0.4); }
+}
+.fear-pulse {
+  animation: fear-pulse 1.5s ease-in-out infinite;
 }

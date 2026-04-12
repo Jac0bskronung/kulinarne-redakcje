@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion';
-import { Home, Cpu } from 'lucide-react';
+import { Home, Cpu, Hammer } from 'lucide-react';
 
 const tabs = [
   { id: 'housing', label: 'Mieszkanie', icon: Home, color: '#10B981' },
   { id: 'ai-news', label: 'Wiadomości AI', icon: Cpu, color: '#3B82F6' },
+  { id: 'remont', label: 'Remont', icon: Hammer, color: '#F59E0B' },
 ];
 
 export const TabNavigation = ({ activeTab, onTabChange }) => {

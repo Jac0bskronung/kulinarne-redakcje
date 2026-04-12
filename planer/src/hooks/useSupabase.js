@@ -87,6 +87,138 @@ export const useSupabase = () => {
     }
   }, []);
 
+  // ===== AUTH FOR REMONT =====
+
+  const ensureAuth = useCallback(async () => {
+    const { data: { session } } = await db.auth.getSession();
+    if (session) return session;
+    const { data, error: err } = await db.auth.signInWithPassword({
+      email: 'test@finpulse.local',
+      password: 'test123456',
+    });
+    if (err) {
+      console.warn('Supabase auth failed:', err.message);
+      return null;
+    }
+    return data.session;
+  }, []);
+
+  // ===== REMONT BUDGET FUNCTIONS =====
+
+  const fetchBudgetConfig = useCallback(async () => {
+    try {
+      const { data, error: err } = await db
+        .from('budget_config')
+        .select('*')
+        .limit(1);
+      if (err) throw err;
+      return data && data.length > 0 ? data[0] : null;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    }
+  }, []);
+
+  const updateBudgetConfig = useCallback(async (totalBudget) => {
+    try {
+      const { data, error: err } = await db
+        .from('budget_config')
+        .update({ total_budget: totalBudget })
+        .select()
+        .limit(1);
+      if (err) throw err;
+      return data;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    }
+  }, []);
+
+  const fetchRooms = useCallback(async () => {
+    try {
+      const { data, error: err } = await db
+        .from('rooms')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      if (err) throw err;
+      return data || [];
+    } catch (err) {
+      setError(err.message);
+      return [];
+    }
+  }, []);
+
+  const fetchExpenseTypes = useCallback(async () => {
+    try {
+      const { data, error: err } = await db
+        .from('expense_types')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      if (err) throw err;
+      return data || [];
+    } catch (err) {
+      setError(err.message);
+      return [];
+    }
+  }, []);
+
+  const fetchItems = useCallback(async () => {
+    try {
+      const { data, error: err } = await db
+        .from('items')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (err) throw err;
+      return data || [];
+    } catch (err) {
+      setError(err.message);
+      return [];
+    }
+  }, []);
+
+  const createItem = useCallback(async (item) => {
+    try {
+      const { data, error: err } = await db
+        .from('items')
+        .insert(item)
+        .select();
+      if (err) throw err;
+      return data ? data[0] : null;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    }
+  }, []);
+
+  const updateItem = useCallback(async (id, changes) => {
+    try {
+      const { data, error: err } = await db
+        .from('items')
+        .update({ ...changes, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select();
+      if (err) throw err;
+      return data ? data[0] : null;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    }
+  }, []);
+
+  const deleteItem = useCallback(async (id) => {
+    try {
+      const { error: err } = await db
+        .from('items')
+        .delete()
+        .eq('id', id);
+      if (err) throw err;
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    }
+  }, []);
+
   return {
     db,
     loading,
@@ -96,6 +228,15 @@ export const useSupabase = () => {
     fetchHousingExpenses,
     fetchLivingExpenses,
     fetchAiNews,
-    fetchCategories
+    fetchCategories,
+    fetchBudgetConfig,
+    updateBudgetConfig,
+    fetchRooms,
+    fetchExpenseTypes,
+    fetchItems,
+    createItem,
+    updateItem,
+    deleteItem,
+    ensureAuth,
   };
 };
