@@ -276,6 +276,31 @@ export const useSupabase = () => {
     return true;
   }, []);
 
+  // ===== HOUSING CATEGORIES =====
+
+  const fetchHousingCategories = useCallback(async () => {
+    try {
+      const { data, error: err } = await db
+        .from('housing_categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      if (err) throw err;
+      return data || [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const createHousingCategory = useCallback(async (name) => {
+    const { data, error: err } = await db
+      .from('housing_categories')
+      .insert({ name, is_custom: true })
+      .select()
+      .single();
+    if (err) throw err;
+    return data;
+  }, []);
+
   return {
     db,
     loading,
@@ -299,5 +324,7 @@ export const useSupabase = () => {
     createHousingExpense,
     updateHousingExpense,
     deleteHousingExpense,
+    fetchHousingCategories,
+    createHousingCategory,
   };
 };
