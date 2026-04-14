@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Zap, Shield, TrendingUp, Plus, X, Check } from 'lucide-react';
+import { Building2, Zap, Shield, TrendingUp, Plus, X } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useEffect, useState, useCallback } from 'react';
 import { useSupabase } from '@/hooks/useSupabase';
@@ -27,7 +27,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 // ─── Expense Form Modal ────────────────────────────────────────
 const getToday = () => new Date().toISOString().split('T')[0];
 
-const ExpenseFormModal = ({ isOpen, onClose, onSave, editingExpense, categories, onAddCategory }) => {
+const ExpenseFormModal = ({ isOpen, onClose, onSave, editingExpense }) => {
   const isEdit = !!editingExpense;
 
   const [form, setForm] = useState({
@@ -36,9 +36,6 @@ const ExpenseFormModal = ({ isOpen, onClose, onSave, editingExpense, categories,
     subcategory: '',
     date: getToday(),
   });
-  const [customInput, setCustomInput] = useState('');
-  const [showCustomInput, setShowCustomInput] = useState(false);
-  const [savingCustom, setSavingCustom] = useState(false);
 
   useEffect(() => {
     if (editingExpense) {
@@ -51,8 +48,6 @@ const ExpenseFormModal = ({ isOpen, onClose, onSave, editingExpense, categories,
     } else {
       setForm({ description: '', amount: '', subcategory: '', date: getToday() });
     }
-    setShowCustomInput(false);
-    setCustomInput('');
   }, [editingExpense, isOpen]);
 
   const handleSubmit = (e) => {
@@ -65,28 +60,6 @@ const ExpenseFormModal = ({ isOpen, onClose, onSave, editingExpense, categories,
       date: form.date,
     });
   };
-
-  const handleAddCustom = async () => {
-    const name = customInput.trim();
-    if (!name) return;
-    setSavingCustom(true);
-    try {
-      await onAddCategory(name);
-      setForm(p => ({ ...p, subcategory: name }));
-      setShowCustomInput(false);
-      setCustomInput('');
-    } finally {
-      setSavingCustom(false);
-    }
-  };
-
-  // Group categories by group_name
-  const groups = categories.reduce((acc, cat) => {
-    const g = cat.group_name || 'Inne';
-    if (!acc[g]) acc[g] = [];
-    acc[g].push(cat);
-    return acc;
-  }, {});
 
   if (!isOpen) return null;
 
@@ -106,11 +79,11 @@ const ExpenseFormModal = ({ isOpen, onClose, onSave, editingExpense, categories,
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="relative w-full max-w-md bg-[#151A23] border border-white/10 rounded-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+          className="relative w-full max-w-md bg-[#151A23] border border-white/10 rounded-xl shadow-2xl overflow-hidden"
           data-testid="expense-form-modal"
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-5 border-b border-white/5 flex-shrink-0">
+          <div className="flex items-center justify-between p-5 border-b border-white/5">
             <h3 className="text-lg font-semibold text-[#F8FAFC]">
               {isEdit ? 'Edytuj wydatek' : 'Nowy wydatek'}
             </h3>
@@ -123,8 +96,8 @@ const ExpenseFormModal = ({ isOpen, onClose, onSave, editingExpense, categories,
             </button>
           </div>
 
-          {/* Form — scrollable */}
-          <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto" data-testid="expense-form">
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="p-5 space-y-4" data-testid="expense-form">
             {/* Description */}
             <div>
               <label className="block text-xs text-[#94A3B8] mb-1.5 uppercase tracking-wider">Nazwa *</label>
@@ -132,7 +105,7 @@ const ExpenseFormModal = ({ isOpen, onClose, onSave, editingExpense, categories,
                 value={form.description}
                 onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
                 className="w-full bg-[#0B0E14] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-[#F8FAFC] placeholder-[#475569] focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500/50"
-                placeholder="np. Czynsz za styczeń"
+                placeholder="np. Czynsz"
                 required
                 data-testid="input-expense-description"
               />
@@ -154,72 +127,16 @@ const ExpenseFormModal = ({ isOpen, onClose, onSave, editingExpense, categories,
               />
             </div>
 
-            {/* Category selector */}
+            {/* Subcategory */}
             <div>
-              <label className="block text-xs text-[#94A3B8] mb-2 uppercase tracking-wider">Kategoria</label>
-              {Object.entries(groups).map(([groupName, cats]) => (
-                <div key={groupName} className="mb-3">
-                  <p className="text-[10px] text-[#475569] uppercase tracking-widest mb-1.5">{groupName}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {cats.map(cat => {
-                      const selected = form.subcategory === cat.name;
-                      return (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => setForm(p => ({ ...p, subcategory: selected ? '' : cat.name }))}
-                          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 ${
-                            selected
-                              ? 'bg-emerald-500 text-[#0B0E14]'
-                              : 'bg-white/5 text-[#94A3B8] hover:bg-white/10 border border-white/10'
-                          }`}
-                        >
-                          {selected && <Check className="w-3 h-3 inline mr-1" />}
-                          {cat.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-
-              {/* Add custom category */}
-              {!showCustomInput ? (
-                <button
-                  type="button"
-                  onClick={() => setShowCustomInput(true)}
-                  className="mt-1 flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Dodaj własną kategorię
-                </button>
-              ) : (
-                <div className="mt-2 flex gap-2">
-                  <input
-                    autoFocus
-                    value={customInput}
-                    onChange={(e) => setCustomInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustom(); } if (e.key === 'Escape') setShowCustomInput(false); }}
-                    className="flex-1 bg-[#0B0E14] border border-emerald-500/40 rounded-lg px-3 py-2 text-sm text-[#F8FAFC] placeholder-[#475569] focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    placeholder="Nazwa kategorii"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddCustom}
-                    disabled={savingCustom || !customInput.trim()}
-                    className="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-[#0B0E14] text-xs font-semibold disabled:opacity-40 transition-colors"
-                  >
-                    {savingCustom ? '...' : 'Dodaj'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowCustomInput(false)}
-                    className="px-2 py-2 rounded-lg border border-white/10 text-[#475569] hover:bg-white/5"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+              <label className="block text-xs text-[#94A3B8] mb-1.5 uppercase tracking-wider">Podkategoria</label>
+              <input
+                value={form.subcategory}
+                onChange={(e) => setForm(p => ({ ...p, subcategory: e.target.value }))}
+                className="w-full bg-[#0B0E14] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-[#F8FAFC] placeholder-[#475569] focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500/50"
+                placeholder="np. Media"
+                data-testid="input-expense-subcategory"
+              />
             </div>
 
             {/* Date */}
@@ -309,13 +226,11 @@ const DeleteConfirmDialog = ({ isOpen, onClose, onConfirm, expenseName }) => {
 
 // ─── Main Component ────────────────────────────────────────────
 export const HousingExpenses = () => {
-  const { fetchHousingExpenses, createHousingExpense, updateHousingExpense, deleteHousingExpense, fetchHousingCategories, createHousingCategory, loading, error: loadError } = useSupabase();
+  const { fetchHousingExpenses, createHousingExpense, updateHousingExpense, deleteHousingExpense, loading, error: loadError } = useSupabase();
 
   const [rawExpenses, setRawExpenses] = useState(null); // null = not yet loaded from Supabase
   const [monthlyData, setMonthlyData] = useState(EMPTY_MONTHLY_DATA);
   const [pieData, setPieData] = useState(EMPTY_PIE_DATA);
-
-  const [categories, setCategories] = useState([]);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -346,14 +261,10 @@ export const HousingExpenses = () => {
   }, []);
 
   const loadData = useCallback(async () => {
-    const [expData, catData] = await Promise.all([
-      fetchHousingExpenses(),
-      fetchHousingCategories(),
-    ]);
-    setRawExpenses(expData || []);
-    setCategories(catData || []);
-    if (expData && expData.length > 0) buildCharts(expData);
-  }, [fetchHousingExpenses, fetchHousingCategories, buildCharts]);
+    const data = await fetchHousingExpenses();
+    setRawExpenses(data || []);
+    if (data && data.length > 0) buildCharts(data);
+  }, [fetchHousingExpenses, buildCharts]);
 
   useEffect(() => {
     loadData();
@@ -378,11 +289,6 @@ export const HousingExpenses = () => {
   const fmt = (n) => Number(n).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   // CRUD handlers
-  const handleAddCategory = async (name) => {
-    const newCat = await createHousingCategory(name);
-    if (newCat) setCategories(prev => [...prev, newCat]);
-  };
-
   const handleOpenAdd = () => {
     setEditingExpense(null);
     setModalOpen(true);
@@ -611,8 +517,6 @@ export const HousingExpenses = () => {
         onClose={() => { setModalOpen(false); setEditingExpense(null); }}
         onSave={handleSave}
         editingExpense={editingExpense}
-        categories={categories}
-        onAddCategory={handleAddCategory}
       />
 
       {/* Delete Confirm */}
