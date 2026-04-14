@@ -232,6 +232,51 @@ export const useSupabase = () => {
     }
   }, []);
 
+  // ===== HOUSING EXPENSES CRUD =====
+
+  const createHousingExpense = useCallback(async (expense) => {
+    try {
+      const { data, error: err } = await db
+        .from('expenses')
+        .insert({ ...expense, category: 'Housing' })
+        .select();
+      if (err) throw err;
+      return data ? data[0] : null;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    }
+  }, []);
+
+  const updateHousingExpense = useCallback(async (id, changes) => {
+    try {
+      const { data, error: err } = await db
+        .from('expenses')
+        .update(changes)
+        .eq('id', id)
+        .select();
+      if (err) throw err;
+      return data ? data[0] : null;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    }
+  }, []);
+
+  const deleteHousingExpense = useCallback(async (id) => {
+    try {
+      const { error: err } = await db
+        .from('expenses')
+        .delete()
+        .eq('id', id);
+      if (err) throw err;
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    }
+  }, []);
+
   return {
     db,
     loading,
@@ -252,5 +297,8 @@ export const useSupabase = () => {
     updateItem,
     deleteItem,
     ensureAuth,
+    createHousingExpense,
+    updateHousingExpense,
+    deleteHousingExpense,
   };
 };

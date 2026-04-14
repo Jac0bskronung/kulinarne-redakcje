@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { Pencil, Trash2 } from 'lucide-react';
 
 const colorMap = {
   green: { icon: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
@@ -6,8 +7,9 @@ const colorMap = {
   blue: { icon: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
 };
 
-export const ExpenseCard = ({ icon: Icon, name, amount, category, color = 'green', date, delay = 0 }) => {
+export const ExpenseCard = ({ icon: Icon, name, amount, category, color = 'green', date, delay = 0, onEdit, onDelete }) => {
   const c = colorMap[color] || colorMap.green;
+  const hasActions = onEdit || onDelete;
 
   return (
     <motion.div
@@ -29,6 +31,30 @@ export const ExpenseCard = ({ icon: Icon, name, amount, category, color = 'green
         <p className="text-sm font-semibold text-[#F8FAFC]">{amount} zł</p>
         {date && <p className="text-xs text-[#475569] mt-0.5">{date}</p>}
       </div>
+      {hasActions && (
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex-shrink-0">
+          {onEdit && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              className="p-1.5 rounded hover:bg-emerald-500/10 text-emerald-400"
+              title="Edytuj"
+              data-testid={`edit-expense-${name.toLowerCase().replace(/\s/g, '-')}`}
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="p-1.5 rounded hover:bg-rose-500/10 text-rose-400"
+              title="Usuń"
+              data-testid={`delete-expense-${name.toLowerCase().replace(/\s/g, '-')}`}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 };
