@@ -235,59 +235,33 @@ export const useSupabase = () => {
   // ===== HOUSING EXPENSES CRUD =====
 
   const createHousingExpense = useCallback(async (expense) => {
-    try {
-      const { error: err } = await db
-        .from('expenses')
-        .insert({ ...expense, category: 'Housing' });
-      if (err) throw err;
-      // Re-fetch the just-inserted row so the body stream is never read twice
-      const { data, error: fetchErr } = await db
-        .from('expenses')
-        .select('*')
-        .eq('category', 'Housing')
-        .order('date', { ascending: false })
-        .limit(1);
-      if (fetchErr) throw fetchErr;
-      return data ? data[0] : null;
-    } catch (err) {
-      setError(err.message);
-      return null;
-    }
+    const { data, error: err } = await db
+      .from('expenses')
+      .insert({ ...expense, category: 'Housing' })
+      .select()
+      .single();
+    if (err) throw err;
+    return data;
   }, []);
 
   const updateHousingExpense = useCallback(async (id, changes) => {
-    try {
-      const { error: err } = await db
-        .from('expenses')
-        .update(changes)
-        .eq('id', id);
-      if (err) throw err;
-      // Re-fetch the updated row so the body stream is never read twice
-      const { data, error: fetchErr } = await db
-        .from('expenses')
-        .select('*')
-        .eq('id', id)
-        .single();
-      if (fetchErr) throw fetchErr;
-      return data || null;
-    } catch (err) {
-      setError(err.message);
-      return null;
-    }
+    const { data, error: err } = await db
+      .from('expenses')
+      .update(changes)
+      .eq('id', id)
+      .select()
+      .single();
+    if (err) throw err;
+    return data;
   }, []);
 
   const deleteHousingExpense = useCallback(async (id) => {
-    try {
-      const { error: err } = await db
-        .from('expenses')
-        .delete()
-        .eq('id', id);
-      if (err) throw err;
-      return true;
-    } catch (err) {
-      setError(err.message);
-      return false;
-    }
+    const { error: err } = await db
+      .from('expenses')
+      .delete()
+      .eq('id', id);
+    if (err) throw err;
+    return true;
   }, []);
 
   return {

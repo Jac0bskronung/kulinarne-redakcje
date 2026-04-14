@@ -226,7 +226,7 @@ const DeleteConfirmDialog = ({ isOpen, onClose, onConfirm, expenseName }) => {
 
 // ─── Main Component ────────────────────────────────────────────
 export const HousingExpenses = () => {
-  const { fetchHousingExpenses, createHousingExpense, updateHousingExpense, deleteHousingExpense, loading, error } = useSupabase();
+  const { fetchHousingExpenses, createHousingExpense, updateHousingExpense, deleteHousingExpense, loading, error: loadError } = useSupabase();
 
   const [rawExpenses, setRawExpenses] = useState(null); // null = not yet loaded from Supabase
   const [monthlyData, setMonthlyData] = useState(EMPTY_MONTHLY_DATA);
@@ -236,6 +236,7 @@ export const HousingExpenses = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, expense: null });
+  const [crudError, setCrudError] = useState(null);
 
   const buildCharts = useCallback((data) => {
     // Monthly trend
@@ -299,23 +300,28 @@ export const HousingExpenses = () => {
   };
 
   const handleSave = async (formData) => {
-    if (editingExpense && editingExpense.id) {
-      const updated = await updateHousingExpense(editingExpense.id, formData);
-      if (updated) {
-        const newList = (rawExpenses || []).map(e => e.id === updated.id ? updated : e);
-        setRawExpenses(newList);
-        buildCharts(newList);
+    setCrudError(null);
+    try {
+      if (editingExpense && editingExpense.id) {
+        const updated = await updateHousingExpense(editingExpense.id, formData);
+        if (updated) {
+          const newList = (rawExpenses || []).map(e => e.id === updated.id ? updated : e);
+          setRawExpenses(newList);
+          buildCharts(newList);
+        }
+      } else {
+        const created = await createHousingExpense(formData);
+        if (created) {
+          const newList = [created, ...(rawExpenses || [])];
+          setRawExpenses(newList);
+          buildCharts(newList);
+        }
       }
-    } else {
-      const created = await createHousingExpense(formData);
-      if (created) {
-        const newList = [created, ...(rawExpenses || [])];
-        setRawExpenses(newList);
-        buildCharts(newList);
-      }
+      setModalOpen(false);
+      setEditingExpense(null);
+    } catch (err) {
+      setCrudError(err.message || 'Nie udało się zapisać wydatku');
     }
-    setModalOpen(false);
-    setEditingExpense(null);
   };
 
   const handleDeleteRequest = (expRaw) => {
@@ -325,8 +331,9 @@ export const HousingExpenses = () => {
   const handleDeleteConfirm = async () => {
     const exp = deleteDialog.expense;
     if (!exp || !exp.id) { setDeleteDialog({ open: false, expense: null }); return; }
-    const ok = await deleteHousingExpense(exp.id);
-    if (ok) {
+    setCrudError(null);
+    try {
+      await deleteHousingExpense(exp.id);
       const newList = (rawExpenses || []).filter(e => e.id !== exp.id);
       setRawExpenses(newList);
       if (newList.length > 0) buildCharts(newList);
@@ -334,12 +341,14 @@ export const HousingExpenses = () => {
         setMonthlyData(EMPTY_MONTHLY_DATA);
         setPieData(EMPTY_PIE_DATA);
       }
+    } catch (err) {
+      setCrudError(err.message || 'Nie udało się usunąć wydatku');
     }
     setDeleteDialog({ open: false, expense: null });
   };
 
   if (loading && rawExpenses === null) return <TabSkeleton />;
-  if (error) return <div className="text-red-400 p-6">Błąd ładowania danych: {error}</div>;
+  if (loadError) return <div className="text-red-400 p-6">Błąd ładowania danych: {loadError}</div>;
 
   return (
     <motion.div
@@ -350,6 +359,16 @@ export const HousingExpenses = () => {
       className="space-y-6"
       data-testid="housing-expenses-tab"
     >
+      {/* CRUD error banner */}
+      {crudError && (
+        <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm">
+          <span>{crudError}</span>
+          <button onClick={() => setCrudError(null)} className="ml-3 hover:text-rose-300">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
