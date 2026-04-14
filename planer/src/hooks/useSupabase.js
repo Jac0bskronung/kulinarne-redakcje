@@ -276,6 +276,78 @@ export const useSupabase = () => {
     return true;
   }, []);
 
+  // ===== FIXED COSTS + MONTHLY SNAPSHOTS =====
+
+  const fetchFixedCostCategories = useCallback(async () => {
+    try {
+      const { data, error: err } = await db
+        .from('housing_categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      if (err) throw err;
+      return data || [];
+    } catch (err) {
+      setError(err.message);
+      return [];
+    }
+  }, []);
+
+  const fetchMonthlySnapshots = useCallback(async () => {
+    try {
+      const { data, error: err } = await db
+        .from('housing_monthly_costs')
+        .select('*')
+        .order('year_month', { ascending: true });
+      if (err) throw err;
+      return data || [];
+    } catch (err) {
+      setError(err.message);
+      return [];
+    }
+  }, []);
+
+  const saveMonthlySnapshot = useCallback(async (yearMonth, costsArray) => {
+    try {
+      const { error: delErr } = await db
+        .from('housing_monthly_costs')
+        .delete()
+        .eq('year_month', yearMonth);
+      if (delErr) throw delErr;
+
+      if (!costsArray || costsArray.length === 0) return [];
+
+      const payload = costsArray.map((c) => ({
+        category_name: c.category_name,
+        amount: c.amount,
+        year_month: yearMonth,
+      }));
+
+      const { data, error: insErr } = await db
+        .from('housing_monthly_costs')
+        .insert(payload)
+        .select();
+      if (insErr) throw insErr;
+      return data || [];
+    } catch (err) {
+      setError(err.message);
+      return null;
+    }
+  }, []);
+
+  const deleteMonthlySnapshot = useCallback(async (yearMonth) => {
+    try {
+      const { error: err } = await db
+        .from('housing_monthly_costs')
+        .delete()
+        .eq('year_month', yearMonth);
+      if (err) throw err;
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    }
+  }, []);
+
   return {
     db,
     loading,
@@ -299,5 +371,9 @@ export const useSupabase = () => {
     createHousingExpense,
     updateHousingExpense,
     deleteHousingExpense,
+    fetchFixedCostCategories,
+    fetchMonthlySnapshots,
+    saveMonthlySnapshot,
+    deleteMonthlySnapshot,
   };
 };

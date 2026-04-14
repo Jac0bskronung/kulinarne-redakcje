@@ -1,353 +1,231 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Zap, Shield, TrendingUp, Plus, X } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { useEffect, useState, useCallback } from 'react';
+import {
+  Building2,
+  Landmark,
+  Wifi,
+  Droplets,
+  Flame,
+  Zap,
+  ShoppingCart,
+  Circle,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  ArrowDownRight,
+  ArrowUpRight,
+} from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSupabase } from '@/hooks/useSupabase';
-import { StatCard } from './StatCard';
-import { ExpenseCard } from './ExpenseCard';
 import { TabSkeleton } from './TabSkeleton';
 
-const EMPTY_MONTHLY_DATA = [];
-const EMPTY_PIE_DATA = [];
+// ─── Icon mapping ──────────────────────────────────────────────
+const ICON_MAP = {
+  Building2,
+  Landmark,
+  Wifi,
+  Droplets,
+  Flame,
+  Zap,
+  ShoppingCart,
+  Circle,
+};
 
-const PIE_COLORS = ['#10B981', '#34D399', '#6EE7B7', '#A7F3D0', '#D1FAE5', '#059669', '#047857', '#065F46'];
+const PALETTE = ['#10B981', '#047857', '#6EE7B7', '#059669', '#34D399', '#A7F3D0', '#065F46'];
 
-const CustomTooltip = ({ active, payload, label }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="custom-tooltip">
-        <p className="label">{label}</p>
-        <p className="value">{payload[0].value} zł</p>
+const MONTHS_SHORT = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'];
+const MONTHS_FULL = [
+  'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
+  'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień',
+];
+
+const getCurrentYearMonth = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+};
+
+const formatYearMonthShort = (ym) => {
+  if (!ym) return '';
+  const [y, m] = ym.split('-');
+  const idx = parseInt(m, 10) - 1;
+  const yy = y.slice(-2);
+  return `${MONTHS_SHORT[idx]} ${yy}`;
+};
+
+const formatYearMonthFull = (ym) => {
+  if (!ym) return '';
+  const [y, m] = ym.split('-');
+  const idx = parseInt(m, 10) - 1;
+  return `${MONTHS_FULL[idx]} ${y}`;
+};
+
+const fmt = (n) =>
+  Number(n || 0).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+// ─── Custom chart tooltip ──────────────────────────────────────
+const ChartTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || !payload.length) return null;
+  const total = payload.reduce((sum, p) => sum + (p.value || 0), 0);
+  return (
+    <div
+      style={{
+        background: '#0B0E14',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '8px',
+        padding: '8px 10px',
+        fontSize: '0.75rem',
+      }}
+    >
+      <div style={{ color: '#F8FAFC', fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      {payload.map((p) => (
+        <div key={p.dataKey} style={{ color: p.fill, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+          <span>{p.dataKey}</span>
+          <span style={{ color: '#F8FAFC' }}>{fmt(p.value)} zł</span>
+        </div>
+      ))}
+      <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.08)', color: '#10B981', fontWeight: 600 }}>
+        Suma: {fmt(total)} zł
       </div>
-    );
-  }
-  return null;
-};
-
-// ─── Expense Form Modal ────────────────────────────────────────
-const getToday = () => new Date().toISOString().split('T')[0];
-
-const ExpenseFormModal = ({ isOpen, onClose, onSave, editingExpense }) => {
-  const isEdit = !!editingExpense;
-
-  const [form, setForm] = useState({
-    description: '',
-    amount: '',
-    subcategory: '',
-    date: getToday(),
-  });
-
-  useEffect(() => {
-    if (editingExpense) {
-      setForm({
-        description: editingExpense.title || '',
-        amount: editingExpense.amount != null ? String(editingExpense.amount) : '',
-        subcategory: editingExpense.note || '',
-        date: editingExpense.date ? editingExpense.date.split('T')[0] : getToday(),
-      });
-    } else {
-      setForm({ description: '', amount: '', subcategory: '', date: getToday() });
-    }
-  }, [editingExpense, isOpen]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!form.description.trim() || !form.amount) return;
-    onSave({
-      description: form.description.trim(),
-      amount: parseFloat(form.amount),
-      subcategory: form.subcategory.trim(),
-      date: form.date,
-    });
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        {/* Backdrop */}
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="relative w-full max-w-md bg-[#151A23] border border-white/10 rounded-xl shadow-2xl overflow-hidden"
-          data-testid="expense-form-modal"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between p-5 border-b border-white/5">
-            <h3 className="text-lg font-semibold text-[#F8FAFC]">
-              {isEdit ? 'Edytuj wydatek' : 'Nowy wydatek'}
-            </h3>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded hover:bg-white/5 text-[#475569]"
-              data-testid="close-expense-modal-btn"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-5 space-y-4" data-testid="expense-form">
-            {/* Description */}
-            <div>
-              <label className="block text-xs text-[#94A3B8] mb-1.5 uppercase tracking-wider">Nazwa *</label>
-              <input
-                value={form.description}
-                onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-                className="w-full bg-[#0B0E14] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-[#F8FAFC] placeholder-[#475569] focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500/50"
-                placeholder="np. Czynsz"
-                required
-                data-testid="input-expense-description"
-              />
-            </div>
-
-            {/* Amount */}
-            <div>
-              <label className="block text-xs text-[#94A3B8] mb-1.5 uppercase tracking-wider">Kwota (zł) *</label>
-              <input
-                type="number"
-                value={form.amount}
-                onChange={(e) => setForm(p => ({ ...p, amount: e.target.value }))}
-                className="w-full bg-[#0B0E14] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-[#F8FAFC] placeholder-[#475569] focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500/50"
-                placeholder="0"
-                min="0"
-                step="0.01"
-                required
-                data-testid="input-expense-amount"
-              />
-            </div>
-
-            {/* Subcategory */}
-            <div>
-              <label className="block text-xs text-[#94A3B8] mb-1.5 uppercase tracking-wider">Podkategoria</label>
-              <input
-                value={form.subcategory}
-                onChange={(e) => setForm(p => ({ ...p, subcategory: e.target.value }))}
-                className="w-full bg-[#0B0E14] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-[#F8FAFC] placeholder-[#475569] focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500/50"
-                placeholder="np. Media"
-                data-testid="input-expense-subcategory"
-              />
-            </div>
-
-            {/* Date */}
-            <div>
-              <label className="block text-xs text-[#94A3B8] mb-1.5 uppercase tracking-wider">Data *</label>
-              <input
-                type="date"
-                value={form.date}
-                onChange={(e) => setForm(p => ({ ...p, date: e.target.value }))}
-                className="w-full bg-[#0B0E14] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-[#F8FAFC] focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500/50"
-                required
-                data-testid="input-expense-date"
-              />
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-2 pt-1">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 py-2.5 rounded-lg border border-white/10 text-[#94A3B8] text-sm hover:bg-white/5 transition-colors"
-                data-testid="cancel-expense-btn"
-              >
-                Anuluj
-              </button>
-              <button
-                type="submit"
-                className="flex-1 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-[#0B0E14] font-semibold text-sm transition-colors duration-200"
-                data-testid="submit-expense-btn"
-              >
-                {isEdit ? 'Zapisz zmiany' : 'Dodaj wydatek'}
-              </button>
-            </div>
-          </form>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-};
-
-// ─── Delete Confirm Dialog ─────────────────────────────────────
-const DeleteConfirmDialog = ({ isOpen, onClose, onConfirm, expenseName }) => {
-  if (!isOpen) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          className="relative w-full max-w-sm bg-[#151A23] border border-white/10 rounded-xl shadow-2xl p-5"
-          data-testid="delete-confirm-dialog"
-        >
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-2">Usuń wydatek</h3>
-          <p className="text-sm text-[#94A3B8] mb-5">
-            Czy na pewno chcesz usunąć <span className="text-rose-400 font-medium">{expenseName}</span>? Tej operacji nie można cofnąć.
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="flex-1 py-2 rounded-lg border border-white/10 text-[#94A3B8] text-sm hover:bg-white/5 transition-colors"
-              data-testid="delete-cancel-btn"
-            >
-              Anuluj
-            </button>
-            <button
-              onClick={onConfirm}
-              className="flex-1 py-2 rounded-lg bg-rose-500 hover:bg-rose-400 text-white font-semibold text-sm transition-colors"
-              data-testid="delete-confirm-btn"
-            >
-              Usuń
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+    </div>
   );
 };
 
 // ─── Main Component ────────────────────────────────────────────
 export const HousingExpenses = () => {
-  const { fetchHousingExpenses, createHousingExpense, updateHousingExpense, deleteHousingExpense, loading, error: loadError } = useSupabase();
+  const {
+    fetchFixedCostCategories,
+    fetchMonthlySnapshots,
+    saveMonthlySnapshot,
+    deleteMonthlySnapshot,
+    error: loadError,
+  } = useSupabase();
 
-  const [rawExpenses, setRawExpenses] = useState(null); // null = not yet loaded from Supabase
-  const [monthlyData, setMonthlyData] = useState(EMPTY_MONTHLY_DATA);
-  const [pieData, setPieData] = useState(EMPTY_PIE_DATA);
+  const [categories, setCategories] = useState(null); // null = not loaded
+  const [snapshots, setSnapshots] = useState([]); // all rows from housing_monthly_costs
+  const [amounts, setAmounts] = useState({}); // { category_name: '1234' }
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState(null);
 
-  // Modal state
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingExpense, setEditingExpense] = useState(null);
-  const [deleteDialog, setDeleteDialog] = useState({ open: false, expense: null });
-  const [crudError, setCrudError] = useState(null);
+  const currentYm = getCurrentYearMonth();
 
-  const buildCharts = useCallback((data) => {
-    // Monthly trend
-    const grouped = {};
-    data.forEach((exp) => {
-      const date = new Date(exp.date).toLocaleDateString('pl-PL', { month: 'short' });
-      if (!grouped[date]) grouped[date] = { name: date, kwota: 0 };
-      grouped[date].kwota += exp.amount;
-    });
-    setMonthlyData(Object.values(grouped).slice(-6));
-
-    // Pie chart by subcategory
-    const categoryMap = {};
-    data.forEach((exp, idx) => {
-      const key = exp.subcategory || 'Inne';
-      if (!categoryMap[key]) {
-        categoryMap[key] = { name: key, value: 0, color: PIE_COLORS[Object.keys(categoryMap).length % PIE_COLORS.length] };
-      }
-      categoryMap[key].value += exp.amount;
-    });
-    setPieData(Object.values(categoryMap));
-  }, []);
-
+  // ─── Load data ────────────────────────────────────────────────
   const loadData = useCallback(async () => {
-    const data = await fetchHousingExpenses();
-    setRawExpenses(data || []);
-    if (data && data.length > 0) buildCharts(data);
-  }, [fetchHousingExpenses, buildCharts]);
+    const [cats, snaps] = await Promise.all([
+      fetchFixedCostCategories(),
+      fetchMonthlySnapshots(),
+    ]);
+    setCategories(cats);
+    setSnapshots(snaps);
+
+    // Prefill amounts: current month if exists, else latest snapshot
+    const byMonth = {};
+    snaps.forEach((s) => {
+      if (!byMonth[s.year_month]) byMonth[s.year_month] = [];
+      byMonth[s.year_month].push(s);
+    });
+
+    let prefill = {};
+    if (byMonth[currentYm]) {
+      byMonth[currentYm].forEach((s) => {
+        prefill[s.category_name] = String(s.amount);
+      });
+    } else {
+      const monthKeys = Object.keys(byMonth).sort();
+      if (monthKeys.length > 0) {
+        const latest = monthKeys[monthKeys.length - 1];
+        byMonth[latest].forEach((s) => {
+          prefill[s.category_name] = String(s.amount);
+        });
+      }
+    }
+    setAmounts(prefill);
+  }, [fetchFixedCostCategories, fetchMonthlySnapshots, currentYm]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const displayExpenses = (rawExpenses || []).map((exp) => ({
-    id: exp.id,
-    _raw: exp,
-    icon: Building2,
-    name: exp.title,
-    amount: exp.amount.toString(),
-    category: exp.note,
-    date: new Date(exp.date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' }),
-  }));
+  // ─── Derived: sum of fixed costs ─────────────────────────────
+  const totalFixed = useMemo(() => {
+    return Object.values(amounts).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+  }, [amounts]);
 
-  const expenses = rawExpenses || [];
-  const total = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-  const avg = expenses.length > 0 ? Math.round(total / expenses.length) : 0;
-  const maxExpense = expenses.reduce((max, e) => (e.amount > (max?.amount || 0) ? e : max), null);
-  const maxLabel = maxExpense ? `zł (${maxExpense.title || maxExpense.name})` : 'zł';
+  // ─── Derived: months map ─────────────────────────────────────
+  const monthsMap = useMemo(() => {
+    const map = {};
+    snapshots.forEach((s) => {
+      if (!map[s.year_month]) map[s.year_month] = {};
+      map[s.year_month][s.category_name] = Number(s.amount) || 0;
+    });
+    return map;
+  }, [snapshots]);
 
-  const fmt = (n) => Number(n).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const sortedMonthsAsc = useMemo(() => Object.keys(monthsMap).sort(), [monthsMap]);
+  const sortedMonthsDesc = useMemo(() => [...sortedMonthsAsc].reverse(), [sortedMonthsAsc]);
 
-  // CRUD handlers
-  const handleOpenAdd = () => {
-    setEditingExpense(null);
-    setModalOpen(true);
+  // ─── Chart data ──────────────────────────────────────────────
+  const chartData = useMemo(() => {
+    if (!categories) return [];
+    return sortedMonthsAsc.map((ym) => {
+      const row = { name: formatYearMonthShort(ym) };
+      categories.forEach((cat) => {
+        row[cat.name] = monthsMap[ym][cat.name] || 0;
+      });
+      return row;
+    });
+  }, [sortedMonthsAsc, categories, monthsMap]);
+
+  // ─── Handlers ────────────────────────────────────────────────
+  const handleAmountChange = (name, value) => {
+    setAmounts((p) => ({ ...p, [name]: value }));
   };
 
-  const handleOpenEdit = (expRaw) => {
-    setEditingExpense(expRaw);
-    setModalOpen(true);
+  const handleSave = async () => {
+    if (!categories) return;
+    setSaving(true);
+    setFeedback(null);
+    const costs = categories
+      .map((cat) => ({
+        category_name: cat.name,
+        amount: parseFloat(amounts[cat.name]) || 0,
+      }))
+      .filter((c) => c.amount > 0);
+
+    const result = await saveMonthlySnapshot(currentYm, costs);
+    if (result === null) {
+      setFeedback({ type: 'error', msg: 'Nie udało się zapisać miesiąca' });
+    } else {
+      setFeedback({ type: 'ok', msg: `Zapisano ${formatYearMonthFull(currentYm)}` });
+      const snaps = await fetchMonthlySnapshots();
+      setSnapshots(snaps);
+    }
+    setSaving(false);
+    setTimeout(() => setFeedback(null), 2500);
   };
 
-  const handleSave = async (formData) => {
-    setCrudError(null);
-    try {
-      if (editingExpense && editingExpense.id) {
-        const updated = await updateHousingExpense(editingExpense.id, formData);
-        if (updated) {
-          const newList = (rawExpenses || []).map(e => e.id === updated.id ? updated : e);
-          setRawExpenses(newList);
-          buildCharts(newList);
-        }
-      } else {
-        const created = await createHousingExpense(formData);
-        if (created) {
-          const newList = [created, ...(rawExpenses || [])];
-          setRawExpenses(newList);
-          buildCharts(newList);
-        }
-      }
-      setModalOpen(false);
-      setEditingExpense(null);
-    } catch (err) {
-      setCrudError(err.message || 'Nie udało się zapisać wydatku');
+  const handleDeleteMonth = async (ym) => {
+    const ok = await deleteMonthlySnapshot(ym);
+    if (ok) {
+      const snaps = await fetchMonthlySnapshots();
+      setSnapshots(snaps);
     }
   };
 
-  const handleDeleteRequest = (expRaw) => {
-    setDeleteDialog({ open: true, expense: expRaw });
-  };
-
-  const handleDeleteConfirm = async () => {
-    const exp = deleteDialog.expense;
-    if (!exp || !exp.id) { setDeleteDialog({ open: false, expense: null }); return; }
-    setCrudError(null);
-    try {
-      await deleteHousingExpense(exp.id);
-      const newList = (rawExpenses || []).filter(e => e.id !== exp.id);
-      setRawExpenses(newList);
-      if (newList.length > 0) buildCharts(newList);
-      else {
-        setMonthlyData(EMPTY_MONTHLY_DATA);
-        setPieData(EMPTY_PIE_DATA);
-      }
-    } catch (err) {
-      setCrudError(err.message || 'Nie udało się usunąć wydatku');
-    }
-    setDeleteDialog({ open: false, expense: null });
-  };
-
-  if (loading && rawExpenses === null) return <TabSkeleton />;
+  // ─── Render ──────────────────────────────────────────────────
+  if (categories === null) return <TabSkeleton />;
   if (loadError) return <div className="text-red-400 p-6">Błąd ładowania danych: {loadError}</div>;
 
   return (
@@ -359,173 +237,306 @@ export const HousingExpenses = () => {
       className="space-y-6"
       data-testid="housing-expenses-tab"
     >
-      {/* CRUD error banner */}
-      {crudError && (
-        <div className="flex items-center justify-between px-4 py-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm">
-          <span>{crudError}</span>
-          <button onClick={() => setCrudError(null)} className="ml-3 hover:text-rose-300">
-            <X className="w-4 h-4" />
+      {/* Feedback banner */}
+      <AnimatePresence>
+        {feedback && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className={`px-4 py-3 rounded-lg text-sm border ${
+              feedback.type === 'error'
+                ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+            }`}
+          >
+            {feedback.msg}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── Section 1: Koszty stałe ─────────────────────────── */}
+      <section className="space-y-4" data-testid="fixed-costs-section">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Koszty stałe</h2>
+          <p className="text-sm text-[#475569] mt-0.5">Wpisz miesięczne kwoty</p>
+        </div>
+
+        <div className="space-y-2">
+          {categories.map((cat, i) => {
+            const Icon = ICON_MAP[cat.icon_key] || Circle;
+            return (
+              <motion.div
+                key={cat.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.04 }}
+                className="flex items-center gap-3 bg-[#151A23] border border-white/5 rounded-xl px-3 py-3"
+                data-testid={`fixed-cost-tile-${cat.name}`}
+              >
+                <div
+                  className="flex items-center justify-center rounded-xl flex-shrink-0"
+                  style={{ background: '#0D2D1E', width: 40, height: 40 }}
+                >
+                  <Icon className="w-5 h-5 text-emerald-400" />
+                </div>
+                <span
+                  className="flex-1 uppercase font-semibold"
+                  style={{ fontSize: '10px', letterSpacing: '0.15em', color: '#475569' }}
+                >
+                  {cat.name}
+                </span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={amounts[cat.name] ?? ''}
+                  onChange={(e) => handleAmountChange(cat.name, e.target.value)}
+                  placeholder="0"
+                  min="0"
+                  step="0.01"
+                  className="text-xl font-bold text-white bg-transparent border-0 outline-none text-right w-24 focus:ring-0"
+                  data-testid={`fixed-cost-input-${cat.name}`}
+                />
+                <span className="text-sm flex-shrink-0" style={{ color: '#475569' }}>
+                  zł
+                </span>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* Sum footer */}
+        <div className="flex items-center justify-between px-3 py-3 border-t border-white/5">
+          <span className="text-sm text-[#94A3B8]">Suma kosztów stałych</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold text-emerald-400" data-testid="fixed-costs-total">
+              {fmt(totalFixed)}
+            </span>
+            <span className="text-sm text-[#475569]">zł</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Section 2: Historia miesięczna ─────────────────── */}
+      <section
+        className="bg-[#151A23] border border-white/5 rounded-xl overflow-hidden"
+        data-testid="monthly-history-section"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 p-4">
+          <button
+            type="button"
+            onClick={() => setHistoryOpen((p) => !p)}
+            className="flex items-center gap-3 flex-1 min-w-0 text-left"
+            data-testid="history-toggle-btn"
+          >
+            <div
+              className="flex items-center justify-center rounded-xl flex-shrink-0"
+              style={{ background: '#0D2D1E', width: 40, height: 40 }}
+            >
+              <Calendar className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-base font-semibold text-white">Historia miesięczna</div>
+              <div className="text-xs" style={{ color: '#475569' }}>
+                {sortedMonthsAsc.length} {sortedMonthsAsc.length === 1 ? 'miesiąc zapisany' : 'miesięcy zapisanych'}
+              </div>
+            </div>
+            {historyOpen ? (
+              <ChevronUp className="w-5 h-5 text-[#475569] flex-shrink-0" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-[#475569] flex-shrink-0" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-[#0B0E14] text-xs font-semibold transition-colors flex-shrink-0"
+            data-testid="save-month-btn"
+          >
+            {saving ? 'Zapisuję...' : `Zapisz ${formatYearMonthFull(currentYm)}`}
           </button>
         </div>
-      )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3">
-          <div className="w-1 h-8 rounded-full bg-emerald-500" />
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F8FAFC]">
-              Wydatki na Mieszkanie
-            </h2>
-            <p className="text-sm text-[#94A3B8] mt-0.5">Luty 2026</p>
-          </div>
-        </div>
-        <button
-          onClick={handleOpenAdd}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-[#0B0E14] font-semibold text-xs transition-colors duration-200"
-          data-testid="add-expense-btn"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Dodaj wydatek
-        </button>
-      </div>
-      <div className="accent-line-green" />
+        {/* Collapsible content */}
+        <AnimatePresence initial={false}>
+          {historyOpen && (
+            <motion.div
+              key="history-content"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              style={{ overflow: 'hidden' }}
+            >
+              <div className="px-4 pb-4 space-y-5 border-t border-white/5 pt-4">
+                {/* Chart */}
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-3">Suma miesięczna</h3>
+                  {chartData.length === 0 ? (
+                    <div className="h-48 flex items-center justify-center text-xs text-[#475569]">
+                      Brak danych do wykresu
+                    </div>
+                  ) : (
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+                          <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
+                          <XAxis
+                            dataKey="name"
+                            stroke="#475569"
+                            fontSize={11}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <YAxis
+                            stroke="#475569"
+                            fontSize={11}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
+                          {categories.map((cat, idx) => (
+                            <Bar
+                              key={cat.id}
+                              dataKey={cat.name}
+                              stackId="costs"
+                              fill={PALETTE[idx % PALETTE.length]}
+                              radius={idx === categories.length - 1 ? [4, 4, 0, 0] : 0}
+                            />
+                          ))}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Building2} label="Suma miesięczna" value={fmt(total)} color="green" delay={0} />
-        <StatCard icon={TrendingUp} label="Śr. wydatek" value={fmt(avg)} color="green" delay={0.05} />
-        <StatCard icon={Zap} label="Najwyższy koszt" value={maxExpense ? fmt(maxExpense.amount) : '0'} color="green" suffix={maxLabel} delay={0.1} />
-        <StatCard icon={Shield} label="Liczba wydatków" value={String(expenses.length)} color="green" delay={0.15} />
-      </div>
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
+                    {categories.map((cat, idx) => (
+                      <div key={cat.id} className="flex items-center gap-1.5">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: PALETTE[idx % PALETTE.length] }}
+                        />
+                        <span className="text-xs" style={{ color: '#94A3B8' }}>
+                          {cat.name}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-      {/* Charts & Expenses grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Area Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="lg:col-span-2 expense-card p-6"
-        >
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-1">Trend wydatków</h3>
-          <p className="text-xs text-[#475569] mb-4">Ostatnie 6 miesięcy</p>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthlyData}>
-                <defs>
-                  <linearGradient id="greenGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="name" stroke="#475569" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#475569" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}`} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="kwota" stroke="#10B981" strokeWidth={2} fill="url(#greenGradient)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
+                {/* Saved months list */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-white">Zapisane miesiące</h3>
+                    <button
+                      type="button"
+                      className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                      data-testid="compare-months-btn"
+                    >
+                      Porównaj miesiące
+                    </button>
+                  </div>
 
-        {/* Pie Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.25 }}
-          className="expense-card p-6"
-        >
-          <h3 className="text-lg font-semibold text-[#F8FAFC] mb-1">Rozkład kosztów</h3>
-          <p className="text-xs text-[#475569] mb-4">Procentowy udział</p>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    background: '#1E2532',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '8px',
-                    fontSize: '0.875rem',
-                  }}
-                  itemStyle={{ color: '#F8FAFC' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            {pieData.map((item) => (
-              <div key={item.name} className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                <span className="text-xs text-[#94A3B8]">{item.name}</span>
+                  {sortedMonthsDesc.length === 0 ? (
+                    <div className="text-xs text-[#475569] py-4 text-center">
+                      Brak zapisanych miesięcy. Kliknij „Zapisz {formatYearMonthFull(currentYm)}", aby utworzyć pierwszy snapshot.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {sortedMonthsDesc.map((ym, idx) => {
+                        const monthObj = monthsMap[ym];
+                        const entries = Object.entries(monthObj);
+                        const total = entries.reduce((s, [, v]) => s + (Number(v) || 0), 0);
+                        const prevYm = sortedMonthsDesc[idx + 1];
+                        let changePct = null;
+                        if (prevYm) {
+                          const prevTotal = Object.values(monthsMap[prevYm]).reduce(
+                            (s, v) => s + (Number(v) || 0),
+                            0
+                          );
+                          if (prevTotal > 0) {
+                            changePct = ((total - prevTotal) / prevTotal) * 100;
+                          }
+                        }
+
+                        const firstFour = entries.slice(0, 4);
+                        const extras = entries.length - 4;
+
+                        return (
+                          <div
+                            key={ym}
+                            className="bg-[#0B0E14] border border-white/5 rounded-xl p-4 flex justify-between gap-4"
+                            data-testid={`month-card-${ym}`}
+                          >
+                            {/* Left */}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold text-white mb-2">
+                                {formatYearMonthFull(ym)}
+                              </div>
+                              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                                {firstFour.map(([name, amt]) => (
+                                  <div key={name} className="text-xs truncate">
+                                    <span style={{ color: '#475569' }}>{name}: </span>
+                                    <span style={{ color: '#94A3B8' }}>{fmt(amt)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              {extras > 0 && (
+                                <div className="text-xs mt-1" style={{ color: '#475569' }}>
+                                  +{extras} więcej
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Right */}
+                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-base font-bold text-emerald-400">
+                                  {fmt(total)} zł
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteMonth(ym)}
+                                  className="text-[#475569] hover:text-rose-400 transition-colors"
+                                  aria-label={`Usuń ${ym}`}
+                                  data-testid={`delete-month-${ym}`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              {changePct !== null && (
+                                <div
+                                  className={`flex items-center gap-1 text-xs ${
+                                    changePct <= 0 ? 'text-emerald-400' : 'text-rose-400'
+                                  }`}
+                                >
+                                  {changePct <= 0 ? (
+                                    <ArrowDownRight className="w-3 h-3" />
+                                  ) : (
+                                    <ArrowUpRight className="w-3 h-3" />
+                                  )}
+                                  <span>
+                                    {changePct > 0 ? '+' : ''}
+                                    {changePct.toFixed(1)}%
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Expense List */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-        className="expense-card p-6"
-      >
-        <h3 className="text-lg font-semibold text-[#F8FAFC] mb-1">Lista wydatków</h3>
-        <p className="text-xs text-[#475569] mb-4">Bieżący miesiąc</p>
-        <div className="space-y-2">
-          {displayExpenses.length === 0 ? (
-            <div className="text-center py-10 text-[#475569]">
-              <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">Brak wydatków. Dodaj pierwszy wydatek przyciskiem powyżej.</p>
-            </div>
-          ) : (
-            displayExpenses.map((expense, i) => (
-              <ExpenseCard
-                key={expense.id ?? expense.name}
-                icon={expense.icon}
-                name={expense.name}
-                amount={expense.amount}
-                category={expense.category}
-                color="green"
-                date={expense.date}
-                delay={i * 0.05}
-                onEdit={() => handleOpenEdit(expense._raw)}
-                onDelete={() => handleDeleteRequest(expense._raw)}
-              />
-            ))
+            </motion.div>
           )}
-        </div>
-      </motion.div>
-
-      {/* Add/Edit Modal */}
-      <ExpenseFormModal
-        isOpen={modalOpen}
-        onClose={() => { setModalOpen(false); setEditingExpense(null); }}
-        onSave={handleSave}
-        editingExpense={editingExpense}
-      />
-
-      {/* Delete Confirm */}
-      <DeleteConfirmDialog
-        isOpen={deleteDialog.open}
-        onClose={() => setDeleteDialog({ open: false, expense: null })}
-        onConfirm={handleDeleteConfirm}
-        expenseName={deleteDialog.expense?.description || ''}
-      />
+        </AnimatePresence>
+      </section>
     </motion.div>
   );
 };
