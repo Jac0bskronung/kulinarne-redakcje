@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Wifi, Droplets, Zap, Flame, Shield, TrendingUp, Plus, X } from 'lucide-react';
+import { Building2, Zap, Shield, TrendingUp, Plus, X } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useEffect, useState, useCallback } from 'react';
 import { useSupabase } from '@/hooks/useSupabase';
@@ -7,33 +7,8 @@ import { StatCard } from './StatCard';
 import { ExpenseCard } from './ExpenseCard';
 import { TabSkeleton } from './TabSkeleton';
 
-// Fallback demo data (jeśli Supabase niedostępny)
-const DEFAULT_MONTHLY_DATA = [
-  { name: 'Wrz', kwota: 2800 },
-  { name: 'Paź', kwota: 3100 },
-  { name: 'Lis', kwota: 3400 },
-  { name: 'Gru', kwota: 3200 },
-  { name: 'Sty', kwota: 2950 },
-  { name: 'Lut', kwota: 3150 },
-];
-
-const DEFAULT_PIE_DATA = [
-  { name: 'Czynsz', value: 1800, color: '#10B981' },
-  { name: 'Media', value: 450, color: '#34D399' },
-  { name: 'Internet', value: 80, color: '#6EE7B7' },
-  { name: 'Prąd', value: 320, color: '#A7F3D0' },
-  { name: 'Gaz', value: 280, color: '#D1FAE5' },
-  { name: 'Ubezp.', value: 220, color: '#059669' },
-];
-
-const DEFAULT_EXPENSES_RAW = [
-  { icon: Building2, name: 'Czynsz', amount: 1800, subcategory: 'Opłata stała', date: '2026-02-01' },
-  { icon: Droplets, name: 'Woda i ścieki', amount: 180, subcategory: 'Media', date: '2026-02-05' },
-  { icon: Zap, name: 'Energia elektryczna', amount: 320, subcategory: 'Media', date: '2026-02-10' },
-  { icon: Flame, name: 'Ogrzewanie / gaz', amount: 280, subcategory: 'Media', date: '2026-02-10' },
-  { icon: Wifi, name: 'Internet', amount: 80, subcategory: 'Telekomunikacja', date: '2026-02-15' },
-  { icon: Shield, name: 'Ubezpieczenie', amount: 220, subcategory: 'Polisa', date: '2026-02-01' },
-];
+const EMPTY_MONTHLY_DATA = [];
+const EMPTY_PIE_DATA = [];
 
 const PIE_COLORS = ['#10B981', '#34D399', '#6EE7B7', '#A7F3D0', '#D1FAE5', '#059669', '#047857', '#065F46'];
 
@@ -254,8 +229,8 @@ export const HousingExpenses = () => {
   const { fetchHousingExpenses, createHousingExpense, updateHousingExpense, deleteHousingExpense, loading, error } = useSupabase();
 
   const [rawExpenses, setRawExpenses] = useState(null); // null = not yet loaded from Supabase
-  const [monthlyData, setMonthlyData] = useState(DEFAULT_MONTHLY_DATA);
-  const [pieData, setPieData] = useState(DEFAULT_PIE_DATA);
+  const [monthlyData, setMonthlyData] = useState(EMPTY_MONTHLY_DATA);
+  const [pieData, setPieData] = useState(EMPTY_PIE_DATA);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -286,45 +261,28 @@ export const HousingExpenses = () => {
 
   const loadData = useCallback(async () => {
     const data = await fetchHousingExpenses();
-    if (data && data.length > 0) {
-      setRawExpenses(data);
-      buildCharts(data);
-    } else {
-      setRawExpenses([]);
-    }
+    setRawExpenses(data || []);
+    if (data && data.length > 0) buildCharts(data);
   }, [fetchHousingExpenses, buildCharts]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Derive display expenses from rawExpenses (or fallback to defaults)
-  const usingFallback = rawExpenses === null || (rawExpenses.length === 0 && !error);
-  const displayExpenses = rawExpenses && rawExpenses.length > 0
-    ? rawExpenses.map((exp) => ({
-        id: exp.id,
-        _raw: exp,
-        icon: Building2,
-        name: exp.description,
-        amount: exp.amount.toString(),
-        category: exp.subcategory,
-        date: new Date(exp.date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' }),
-      }))
-    : DEFAULT_EXPENSES_RAW.map((exp) => ({
-        id: null,
-        _raw: exp,
-        icon: exp.icon,
-        name: exp.name,
-        amount: exp.amount.toString(),
-        category: exp.subcategory,
-        date: new Date(exp.date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' }),
-      }));
+  const displayExpenses = (rawExpenses || []).map((exp) => ({
+    id: exp.id,
+    _raw: exp,
+    icon: Building2,
+    name: exp.description,
+    amount: exp.amount.toString(),
+    category: exp.subcategory,
+    date: new Date(exp.date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' }),
+  }));
 
-  // Dynamic stats from real data (or fallback defaults)
-  const statsExpenses = rawExpenses && rawExpenses.length > 0 ? rawExpenses : DEFAULT_EXPENSES_RAW;
-  const total = statsExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-  const avg = statsExpenses.length > 0 ? Math.round(total / statsExpenses.length) : 0;
-  const maxExpense = statsExpenses.reduce((max, e) => (e.amount > (max?.amount || 0) ? e : max), null);
+  const expenses = rawExpenses || [];
+  const total = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const avg = expenses.length > 0 ? Math.round(total / expenses.length) : 0;
+  const maxExpense = expenses.reduce((max, e) => (e.amount > (max?.amount || 0) ? e : max), null);
   const maxLabel = maxExpense ? `zł (${maxExpense.description || maxExpense.name})` : 'zł';
 
   const fmt = (n) => Number(n).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -373,8 +331,8 @@ export const HousingExpenses = () => {
       setRawExpenses(newList);
       if (newList.length > 0) buildCharts(newList);
       else {
-        setMonthlyData(DEFAULT_MONTHLY_DATA);
-        setPieData(DEFAULT_PIE_DATA);
+        setMonthlyData(EMPTY_MONTHLY_DATA);
+        setPieData(EMPTY_PIE_DATA);
       }
     }
     setDeleteDialog({ open: false, expense: null });
@@ -416,10 +374,10 @@ export const HousingExpenses = () => {
 
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Building2} label="Suma miesięczna" value={fmt(total)} color="green" trend={5.2} delay={0} />
+        <StatCard icon={Building2} label="Suma miesięczna" value={fmt(total)} color="green" delay={0} />
         <StatCard icon={TrendingUp} label="Śr. wydatek" value={fmt(avg)} color="green" delay={0.05} />
         <StatCard icon={Zap} label="Najwyższy koszt" value={maxExpense ? fmt(maxExpense.amount) : '0'} color="green" suffix={maxLabel} delay={0.1} />
-        <StatCard icon={Shield} label="Liczba wydatków" value={String(statsExpenses.length)} color="green" delay={0.15} />
+        <StatCard icon={Shield} label="Liczba wydatków" value={String(expenses.length)} color="green" delay={0.15} />
       </div>
 
       {/* Charts & Expenses grid */}
@@ -510,20 +468,27 @@ export const HousingExpenses = () => {
         <h3 className="text-lg font-semibold text-[#F8FAFC] mb-1">Lista wydatków</h3>
         <p className="text-xs text-[#475569] mb-4">Bieżący miesiąc</p>
         <div className="space-y-2">
-          {displayExpenses.map((expense, i) => (
-            <ExpenseCard
-              key={expense.id ?? expense.name}
-              icon={expense.icon}
-              name={expense.name}
-              amount={expense.amount}
-              category={expense.category}
-              color="green"
-              date={expense.date}
-              delay={i * 0.05}
-              onEdit={expense.id ? () => handleOpenEdit(expense._raw) : undefined}
-              onDelete={expense.id ? () => handleDeleteRequest(expense._raw) : undefined}
-            />
-          ))}
+          {displayExpenses.length === 0 ? (
+            <div className="text-center py-10 text-[#475569]">
+              <Building2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Brak wydatków. Dodaj pierwszy wydatek przyciskiem powyżej.</p>
+            </div>
+          ) : (
+            displayExpenses.map((expense, i) => (
+              <ExpenseCard
+                key={expense.id ?? expense.name}
+                icon={expense.icon}
+                name={expense.name}
+                amount={expense.amount}
+                category={expense.category}
+                color="green"
+                date={expense.date}
+                delay={i * 0.05}
+                onEdit={() => handleOpenEdit(expense._raw)}
+                onDelete={() => handleDeleteRequest(expense._raw)}
+              />
+            ))
+          )}
         </div>
       </motion.div>
 
