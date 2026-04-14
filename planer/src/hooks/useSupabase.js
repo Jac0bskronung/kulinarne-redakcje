@@ -236,11 +236,18 @@ export const useSupabase = () => {
 
   const createHousingExpense = useCallback(async (expense) => {
     try {
-      const { data, error: err } = await db
+      const { error: err } = await db
         .from('expenses')
-        .insert({ ...expense, category: 'Housing' })
-        .select();
+        .insert({ ...expense, category: 'Housing' });
       if (err) throw err;
+      // Re-fetch the just-inserted row so the body stream is never read twice
+      const { data, error: fetchErr } = await db
+        .from('expenses')
+        .select('*')
+        .eq('category', 'Housing')
+        .order('date', { ascending: false })
+        .limit(1);
+      if (fetchErr) throw fetchErr;
       return data ? data[0] : null;
     } catch (err) {
       setError(err.message);
@@ -250,13 +257,19 @@ export const useSupabase = () => {
 
   const updateHousingExpense = useCallback(async (id, changes) => {
     try {
-      const { data, error: err } = await db
+      const { error: err } = await db
         .from('expenses')
         .update(changes)
-        .eq('id', id)
-        .select();
+        .eq('id', id);
       if (err) throw err;
-      return data ? data[0] : null;
+      // Re-fetch the updated row so the body stream is never read twice
+      const { data, error: fetchErr } = await db
+        .from('expenses')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (fetchErr) throw fetchErr;
+      return data || null;
     } catch (err) {
       setError(err.message);
       return null;
