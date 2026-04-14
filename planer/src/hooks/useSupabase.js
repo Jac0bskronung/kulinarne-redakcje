@@ -235,9 +235,16 @@ export const useSupabase = () => {
   // ===== HOUSING EXPENSES CRUD =====
 
   const createHousingExpense = useCallback(async (expense) => {
+    // Form sends {description, amount, subcategory, date} — map to actual DB columns
     const { data, error: err } = await db
       .from('expenses')
-      .insert({ ...expense, category: 'Housing' })
+      .insert({
+        title: expense.description,
+        amount: expense.amount,
+        note: expense.subcategory,
+        date: expense.date,
+        category: 'Housing',
+      })
       .select()
       .single();
     if (err) throw err;
@@ -247,7 +254,12 @@ export const useSupabase = () => {
   const updateHousingExpense = useCallback(async (id, changes) => {
     const { data, error: err } = await db
       .from('expenses')
-      .update(changes)
+      .update({
+        title: changes.description,
+        amount: changes.amount,
+        note: changes.subcategory,
+        date: changes.date,
+      })
       .eq('id', id)
       .select()
       .single();

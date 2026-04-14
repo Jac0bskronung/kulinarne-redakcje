@@ -40,9 +40,9 @@ const ExpenseFormModal = ({ isOpen, onClose, onSave, editingExpense }) => {
   useEffect(() => {
     if (editingExpense) {
       setForm({
-        description: editingExpense.description || '',
+        description: editingExpense.title || '',
         amount: editingExpense.amount != null ? String(editingExpense.amount) : '',
-        subcategory: editingExpense.subcategory || '',
+        subcategory: editingExpense.note || '',
         date: editingExpense.date ? editingExpense.date.split('T')[0] : getToday(),
       });
     } else {
@@ -274,9 +274,9 @@ export const HousingExpenses = () => {
     id: exp.id,
     _raw: exp,
     icon: Building2,
-    name: exp.description,
+    name: exp.title,
     amount: exp.amount.toString(),
-    category: exp.subcategory,
+    category: exp.note,
     date: new Date(exp.date).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit' }),
   }));
 
@@ -284,7 +284,7 @@ export const HousingExpenses = () => {
   const total = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const avg = expenses.length > 0 ? Math.round(total / expenses.length) : 0;
   const maxExpense = expenses.reduce((max, e) => (e.amount > (max?.amount || 0) ? e : max), null);
-  const maxLabel = maxExpense ? `zł (${maxExpense.description || maxExpense.name})` : 'zł';
+  const maxLabel = maxExpense ? `zł (${maxExpense.title || maxExpense.name})` : 'zł';
 
   const fmt = (n) => Number(n).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
