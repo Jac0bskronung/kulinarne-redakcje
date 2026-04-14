@@ -49,8 +49,9 @@ export const useSupabase = () => {
     try {
       const { data, error: err } = await db
         .from('digests')
-        .select('ai_items, date')
+        .select('ai_items, date, created_at')
         .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(1);
 
       if (err || !data || data.length === 0) return [];
