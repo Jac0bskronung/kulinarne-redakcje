@@ -276,34 +276,6 @@ export const useSupabase = () => {
     return true;
   }, []);
 
-  // ===== HOUSING MONTHLY COSTS =====
-
-  const fetchMonthlyHousingCosts = useCallback(async (yearMonths) => {
-    try {
-      const { data, error: err } = await db
-        .from('housing_monthly_costs')
-        .select('*')
-        .in('year_month', yearMonths);
-      if (err) throw err;
-      return data || [];
-    } catch {
-      return [];
-    }
-  }, []);
-
-  const upsertMonthlyHousingCost = useCallback(async (categoryName, amount, yearMonth) => {
-    const { data, error: err } = await db
-      .from('housing_monthly_costs')
-      .upsert(
-        { category_name: categoryName, amount, year_month: yearMonth, updated_at: new Date().toISOString() },
-        { onConflict: 'category_name,year_month' }
-      )
-      .select()
-      .single();
-    if (err) throw err;
-    return data;
-  }, []);
-
   // ===== HOUSING CATEGORIES =====
 
   const fetchHousingCategories = useCallback(async () => {
@@ -354,7 +326,5 @@ export const useSupabase = () => {
     deleteHousingExpense,
     fetchHousingCategories,
     createHousingCategory,
-    fetchMonthlyHousingCosts,
-    upsertMonthlyHousingCost,
   };
 };

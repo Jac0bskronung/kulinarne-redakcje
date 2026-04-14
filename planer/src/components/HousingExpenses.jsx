@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Building2, Zap, Shield, TrendingUp, Plus, X, Check, Wifi, Droplets, Flame, ShoppingCart, CreditCard, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
+import { Building2, Zap, Shield, TrendingUp, Plus, X, Check } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useEffect, useState, useCallback } from 'react';
 import { useSupabase } from '@/hooks/useSupabase';
@@ -22,128 +22,6 @@ const CustomTooltip = ({ active, payload, label }) => {
     );
   }
   return null;
-};
-
-// ─── Month helpers ────────────────────────────────────────────
-const MONTHS_PL = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
-
-const todayYearMonth = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-};
-
-const prevYM = (ym) => {
-  const [y, m] = ym.split('-').map(Number);
-  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
-};
-
-const nextYM = (ym) => {
-  const [y, m] = ym.split('-').map(Number);
-  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
-};
-
-const labelYM = (ym) => {
-  const [y, m] = ym.split('-').map(Number);
-  return `${MONTHS_PL[m - 1]} ${y}`;
-};
-
-// ─── Category icon map ────────────────────────────────────────
-const CATEGORY_ICONS = {
-  'Czynsz': Building2,
-  'Rata kredytu': CreditCard,
-  'Internet': Wifi,
-  'Ciepła woda': Droplets,
-  'Gaz': Flame,
-  'Prąd': Zap,
-  'Zakupy spożywcze': ShoppingCart,
-};
-
-// ─── Fixed Cost Tile ──────────────────────────────────────────
-const FixedCostTile = ({ name, currentAmount, prevAmount, onSave, delay }) => {
-  const [editing, setEditing] = useState(false);
-  const [inputVal, setInputVal] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const Icon = CATEGORY_ICONS[name] || Building2;
-
-  const trend = (prevAmount != null && currentAmount != null && prevAmount > 0)
-    ? ((currentAmount - prevAmount) / prevAmount * 100)
-    : null;
-
-  const startEdit = () => {
-    setInputVal(currentAmount != null ? String(currentAmount) : '');
-    setEditing(true);
-  };
-
-  const handleSave = async () => {
-    const val = parseFloat(inputVal);
-    if (isNaN(val) || val < 0) return;
-    setSaving(true);
-    try { await onSave(val); } finally { setSaving(false); }
-    setEditing(false);
-  };
-
-  const fmt = (n) => Number(n).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: delay || 0 }}
-      className="expense-card p-4"
-    >
-      {/* Top row: icon + trend */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
-          <Icon className="w-4 h-4 text-emerald-400" />
-        </div>
-        {trend != null ? (
-          <span className={`text-xs font-semibold ${trend > 0 ? 'text-red-400' : trend < 0 ? 'text-emerald-400' : 'text-[#475569]'}`}>
-            {trend > 0 ? '+' : ''}{trend.toFixed(1)}%
-          </span>
-        ) : (
-          <span className="text-[10px] text-[#334155]">brak danych</span>
-        )}
-      </div>
-
-      {/* Category label */}
-      <p className="text-[11px] text-[#475569] uppercase tracking-wider mb-1.5 truncate">{name}</p>
-
-      {/* Value / edit */}
-      {editing ? (
-        <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
-          <input
-            autoFocus
-            type="number"
-            value={inputVal}
-            onChange={e => setInputVal(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false); }}
-            className="flex-1 min-w-0 bg-[#0B0E14] border border-emerald-500/50 rounded-md px-2 py-1.5 text-sm text-[#F8FAFC] focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            placeholder="0"
-            min="0"
-            step="0.01"
-          />
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-2.5 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-[#0B0E14] disabled:opacity-40 flex-shrink-0"
-          >
-            {saving ? '…' : <Check className="w-3.5 h-3.5" />}
-          </button>
-          <button onClick={() => setEditing(false)} className="px-2 py-1.5 rounded-md border border-white/10 text-[#475569] hover:bg-white/5 flex-shrink-0">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ) : (
-        <button onClick={startEdit} className="text-left w-full group flex items-end gap-2">
-          <span className={`text-2xl font-bold leading-none ${currentAmount != null ? 'text-emerald-400' : 'text-[#334155]'}`}>
-            {currentAmount != null ? `${fmt(currentAmount)} zł` : '— zł'}
-          </span>
-          <Pencil className="w-3 h-3 text-[#334155] group-hover:text-[#475569] mb-0.5 transition-colors flex-shrink-0" />
-        </button>
-      )}
-    </motion.div>
-  );
 };
 
 // ─── Expense Form Modal ────────────────────────────────────────
@@ -431,22 +309,13 @@ const DeleteConfirmDialog = ({ isOpen, onClose, onConfirm, expenseName }) => {
 
 // ─── Main Component ────────────────────────────────────────────
 export const HousingExpenses = () => {
-  const {
-    fetchHousingExpenses, createHousingExpense, updateHousingExpense, deleteHousingExpense,
-    fetchHousingCategories, createHousingCategory,
-    fetchMonthlyHousingCosts, upsertMonthlyHousingCost,
-    loading, error: loadError,
-  } = useSupabase();
+  const { fetchHousingExpenses, createHousingExpense, updateHousingExpense, deleteHousingExpense, fetchHousingCategories, createHousingCategory, loading, error: loadError } = useSupabase();
 
-  const [rawExpenses, setRawExpenses] = useState(null);
+  const [rawExpenses, setRawExpenses] = useState(null); // null = not yet loaded from Supabase
   const [monthlyData, setMonthlyData] = useState(EMPTY_MONTHLY_DATA);
   const [pieData, setPieData] = useState(EMPTY_PIE_DATA);
 
   const [categories, setCategories] = useState([]);
-
-  // Monthly fixed costs state
-  const [selectedYM, setSelectedYM] = useState(todayYearMonth);
-  const [monthlyCosts, setMonthlyCosts] = useState({});  // { 'YYYY-MM': { categoryName: amount } }
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -477,24 +346,14 @@ export const HousingExpenses = () => {
   }, []);
 
   const loadData = useCallback(async () => {
-    const cur = selectedYM;
-    const prev = prevYM(cur);
-    const [expData, catData, costsData] = await Promise.all([
+    const [expData, catData] = await Promise.all([
       fetchHousingExpenses(),
       fetchHousingCategories(),
-      fetchMonthlyHousingCosts([cur, prev]),
     ]);
     setRawExpenses(expData || []);
     setCategories(catData || []);
-    // Index costs by year_month → category_name → amount
-    const indexed = {};
-    for (const row of (costsData || [])) {
-      if (!indexed[row.year_month]) indexed[row.year_month] = {};
-      indexed[row.year_month][row.category_name] = row.amount;
-    }
-    setMonthlyCosts(indexed);
     if (expData && expData.length > 0) buildCharts(expData);
-  }, [fetchHousingExpenses, fetchHousingCategories, fetchMonthlyHousingCosts, buildCharts, selectedYM]);
+  }, [fetchHousingExpenses, fetchHousingCategories, buildCharts]);
 
   useEffect(() => {
     loadData();
@@ -519,14 +378,6 @@ export const HousingExpenses = () => {
   const fmt = (n) => Number(n).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   // CRUD handlers
-  const handleSaveMonthlyCost = async (categoryName, amount) => {
-    await upsertMonthlyHousingCost(categoryName, amount, selectedYM);
-    setMonthlyCosts(prev => ({
-      ...prev,
-      [selectedYM]: { ...(prev[selectedYM] || {}), [categoryName]: amount },
-    }));
-  };
-
   const handleAddCategory = async (name) => {
     const newCat = await createHousingCategory(name);
     if (newCat) setCategories(prev => [...prev, newCat]);
@@ -620,7 +471,7 @@ export const HousingExpenses = () => {
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F8FAFC]">
               Wydatki na Mieszkanie
             </h2>
-            <p className="text-sm text-[#94A3B8] mt-0.5">{labelYM(selectedYM)}</p>
+            <p className="text-sm text-[#94A3B8] mt-0.5">Luty 2026</p>
           </div>
         </div>
         <button
@@ -641,59 +492,6 @@ export const HousingExpenses = () => {
         <StatCard icon={Zap} label="Najwyższy koszt" value={maxExpense ? fmt(maxExpense.amount) : '0'} color="green" suffix={maxLabel} delay={0.1} />
         <StatCard icon={Shield} label="Liczba wydatków" value={String(expenses.length)} color="green" delay={0.15} />
       </div>
-
-      {/* ── Koszty Stałe ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.15 }}
-        className="expense-card p-5"
-      >
-        {/* Section header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-base font-semibold text-[#F8FAFC]">Koszty Stałe</h3>
-            <p className="text-xs text-[#475569] mt-0.5">Kliknij kwotę aby wpisać lub zmienić wartość</p>
-          </div>
-          {/* Month navigation */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setSelectedYM(ym => prevYM(ym))}
-              className="p-1.5 rounded-lg border border-white/10 text-[#475569] hover:bg-white/5 hover:text-[#94A3B8] transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-sm font-medium text-[#94A3B8] px-2 min-w-[110px] text-center">
-              {labelYM(selectedYM)}
-            </span>
-            <button
-              onClick={() => setSelectedYM(ym => nextYM(ym))}
-              disabled={selectedYM >= todayYearMonth()}
-              className="p-1.5 rounded-lg border border-white/10 text-[#475569] hover:bg-white/5 hover:text-[#94A3B8] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Tiles grid */}
-        {categories.length === 0 ? (
-          <p className="text-sm text-[#334155] text-center py-4">Ładowanie kategorii…</p>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {categories.map((cat, i) => (
-              <FixedCostTile
-                key={cat.id}
-                name={cat.name}
-                currentAmount={monthlyCosts[selectedYM]?.[cat.name] ?? null}
-                prevAmount={monthlyCosts[prevYM(selectedYM)]?.[cat.name] ?? null}
-                onSave={(amount) => handleSaveMonthlyCost(cat.name, amount)}
-                delay={i * 0.04}
-              />
-            ))}
-          </div>
-        )}
-      </motion.div>
 
       {/* Charts & Expenses grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
