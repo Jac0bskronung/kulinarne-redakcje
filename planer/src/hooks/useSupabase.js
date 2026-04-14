@@ -119,13 +119,11 @@ export const useSupabase = () => {
     }
   }, []);
 
-  const updateBudgetConfig = useCallback(async (totalBudget) => {
+  const updateBudgetConfig = useCallback(async (totalBudget, id) => {
     try {
-      const { data, error: err } = await db
-        .from('budget_config')
-        .update({ total_budget: totalBudget })
-        .select()
-        .limit(1);
+      let query = db.from('budget_config').update({ total_budget: totalBudget });
+      query = id != null ? query.eq('id', id) : query.not('id', 'is', null);
+      const { data, error: err } = await query.select().limit(1);
       if (err) throw err;
       return data;
     } catch (err) {

@@ -943,7 +943,7 @@ export const RemontBudget = () => {
   };
 
   const handleEditBudget = async (val) => {
-    await updateBudgetConfig(val);
+    await updateBudgetConfig(val, budgetConfig?.id);
     setBudgetConfig(prev => ({ ...prev, total_budget: val }));
   };
 
