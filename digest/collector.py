@@ -243,6 +243,59 @@ def call_gemini(prompt):
             last_err = e
     raise RuntimeError(f"Gemini: wszystkie modele zawiodły. Ostatni błąd: {last_err}")
 
+def translate_ai_items(items):
+    """Tłumaczy i streszcza ai_items na polski przez Gemini.
+    Dodaje pola title_pl i summary_pl. Przy błędzie zwraca oryginały."""
+    if not items:
+        return items
+
+    # Ogranicz payload — tylko co potrzebne do tłumaczenia
+    payload = [
+        {"i": idx, "title": it.get("title", ""), "summary": (it.get("summary") or "")[:400]}
+        for idx, it in enumerate(items)
+    ]
+
+    prompt = (
+        "Przetłumacz i streść poniższe angielskie newsy AI na polski. "
+        "Dla każdego itemu zwróć obiekt JSON z polami: i (indeks z wejścia), "
+        "title_pl (polski tytuł), summary_pl (2-3 zdania po polsku: co artykuł mówi, "
+        "co jest kluczowe). "
+        "Wejście:\n"
+        f"{json.dumps(payload, ensure_ascii=False)}\n\n"
+        "Wyjście: TYLKO JSON array (bez markdown, bez komentarzy), np. "
+        '[{"i":0,"title_pl":"...","summary_pl":"..."}]'
+    )
+
+    try:
+        raw = call_gemini(prompt)
+        # Usuń ewentualne code fences
+        text = raw.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text
+            if text.endswith("```"):
+                text = text.rsplit("```", 1)[0]
+            text = text.strip()
+            if text.startswith("json"):
+                text = text[4:].strip()
+        # Wyciągnij array, gdyby model dorzucił otoczkę
+        start = text.find("[")
+        end = text.rfind("]")
+        if start != -1 and end != -1:
+            text = text[start:end + 1]
+        parsed = json.loads(text)
+        by_idx = {entry["i"]: entry for entry in parsed if isinstance(entry, dict) and "i" in entry}
+        for idx, it in enumerate(items):
+            entry = by_idx.get(idx)
+            if entry:
+                if entry.get("title_pl"):
+                    it["title_pl"] = entry["title_pl"]
+                if entry.get("summary_pl"):
+                    it["summary_pl"] = entry["summary_pl"]
+        print(f"  [Translate] Przetłumaczono {len(by_idx)}/{len(items)} itemów")
+    except Exception as e:
+        print(f"  [Translate] BŁĄD tłumaczenia, zapisuję oryginały: {e}", file=sys.stderr)
+    return items
+
 def save_to_supabase(title, content, ai_items, football_results, github_projects):
     url = f"{SUPABASE_URL}/rest/v1/digests"
     print(f"  [Supabase] POST → {url}")
@@ -320,9 +373,13 @@ def main():
     title = f"Digest {EDITION_PL} — {DATE_STR}"
     print(f"   Wygenerowano {len(content)} znaków")
 
-    # 3. Zapisz
-    print(f"\n5. Zapisywanie...")
-    save_to_supabase(title, content, ai_items[:20], football_results, github_projects)
+    # 3. Przetłumacz ai_items na polski (title_pl, summary_pl) — dla frontendu
+    print(f"\n5. Tłumaczenie ai_items na polski...")
+    ai_items_pl = translate_ai_items(ai_items[:20])
+
+    # 4. Zapisz
+    print(f"\n6. Zapisywanie...")
+    save_to_supabase(title, content, ai_items_pl, football_results, github_projects)
     save_to_wiki(title, content)
 
     print(f"\n✓ Digest gotowy!\n")

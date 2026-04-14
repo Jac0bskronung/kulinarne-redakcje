@@ -126,10 +126,10 @@ export const AiNews = () => {
       if (data && data.length > 0) {
         setNewsItems(
           data.map((item, idx) => {
-            const plainSummary = stripHtml(item.summary);
+            const plainSummary = stripHtml(item.summary_pl || item.summary);
             return {
               id: idx,
-              title: item.title || 'Bez tytułu',
+              title: item.title_pl || item.title || 'Bez tytułu',
               summary: plainSummary,
               category: item.source || 'AI',
               link: item.link || '#',
