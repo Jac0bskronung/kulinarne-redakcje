@@ -50,15 +50,16 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 // ─── Expense Form Modal ────────────────────────────────────────
+const getToday = () => new Date().toISOString().split('T')[0];
+
 const ExpenseFormModal = ({ isOpen, onClose, onSave, editingExpense }) => {
   const isEdit = !!editingExpense;
-  const today = new Date().toISOString().split('T')[0];
 
   const [form, setForm] = useState({
     description: '',
     amount: '',
     subcategory: '',
-    date: today,
+    date: getToday(),
   });
 
   useEffect(() => {
@@ -67,10 +68,10 @@ const ExpenseFormModal = ({ isOpen, onClose, onSave, editingExpense }) => {
         description: editingExpense.description || '',
         amount: editingExpense.amount != null ? String(editingExpense.amount) : '',
         subcategory: editingExpense.subcategory || '',
-        date: editingExpense.date ? editingExpense.date.split('T')[0] : today,
+        date: editingExpense.date ? editingExpense.date.split('T')[0] : getToday(),
       });
     } else {
-      setForm({ description: '', amount: '', subcategory: '', date: today });
+      setForm({ description: '', amount: '', subcategory: '', date: getToday() });
     }
   }, [editingExpense, isOpen]);
 
