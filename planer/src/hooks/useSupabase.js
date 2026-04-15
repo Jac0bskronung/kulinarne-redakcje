@@ -357,13 +357,21 @@ export const useSupabase = () => {
         .limit(1);
       const nextOrder = existing && existing.length > 0 ? (existing[0].sort_order + 1) : 1;
 
-      const { data, error: err } = await db
+      // Insert without .select() — chaining causes double body-stream read in Supabase JS v2
+      const { error: err } = await db
         .from('housing_categories')
-        .insert({ name, icon_key: iconKey, sort_order: nextOrder })
-        .select()
-        .single();
+        .insert({ name, icon_key: iconKey, sort_order: nextOrder });
       if (err) throw err;
-      return data;
+
+      // Separate fetch to get the inserted row
+      const { data, error: fetchErr } = await db
+        .from('housing_categories')
+        .select('*')
+        .eq('name', name)
+        .order('sort_order', { ascending: false })
+        .limit(1);
+      if (fetchErr) throw fetchErr;
+      return data ? data[0] : null;
     } catch (err) {
       setError(err.message);
       return null;
