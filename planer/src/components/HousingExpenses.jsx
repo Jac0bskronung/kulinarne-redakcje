@@ -14,6 +14,8 @@ import {
   Trash2,
   ArrowDownRight,
   ArrowUpRight,
+  Plus,
+  X,
 } from 'lucide-react';
 import {
   BarChart,
@@ -40,7 +42,11 @@ const ICON_MAP = {
   Circle,
 };
 
-const PALETTE = ['#10B981', '#047857', '#6EE7B7', '#059669', '#34D399', '#A7F3D0', '#065F46'];
+const PALETTE = [
+  '#10B981', '#3B82F6', '#F59E0B', '#8B5CF6', '#EC4899',
+  '#34D399', '#60A5FA', '#FBBF24', '#A78BFA', '#F9A8D4',
+  '#047857', '#1D4ED8', '#D97706', '#6D28D9', '#BE185D',
+];
 
 const MONTHS_SHORT = ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'];
 const MONTHS_FULL = [
@@ -108,6 +114,7 @@ export const HousingExpenses = () => {
     fetchMonthlySnapshots,
     saveMonthlySnapshot,
     deleteMonthlySnapshot,
+    addFixedCostCategory,
     error: loadError,
   } = useSupabase();
 
@@ -117,6 +124,12 @@ export const HousingExpenses = () => {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
+
+  // Add category modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatIcon, setNewCatIcon] = useState('Circle');
+  const [addingSaving, setAddingSaving] = useState(false);
 
   const currentYm = getCurrentYearMonth();
 
@@ -224,6 +237,26 @@ export const HousingExpenses = () => {
     }
   };
 
+  const handleAddCategory = async () => {
+    const trimmed = newCatName.trim();
+    if (!trimmed) return;
+    setAddingSaving(true);
+    const result = await addFixedCostCategory(trimmed, newCatIcon);
+    if (result) {
+      const cats = await fetchFixedCostCategories();
+      setCategories(cats);
+      setShowAddModal(false);
+      setNewCatName('');
+      setNewCatIcon('Circle');
+      setFeedback({ type: 'ok', msg: `Dodano kategorię „${trimmed}"` });
+      setTimeout(() => setFeedback(null), 2500);
+    } else {
+      setFeedback({ type: 'error', msg: 'Nie udało się dodać kategorii' });
+      setTimeout(() => setFeedback(null), 2500);
+    }
+    setAddingSaving(false);
+  };
+
   // ─── Render ──────────────────────────────────────────────────
   if (categories === null) return <TabSkeleton />;
   if (loadError) return <div className="text-red-400 p-6">Błąd ładowania danych: {loadError}</div>;
@@ -257,9 +290,22 @@ export const HousingExpenses = () => {
 
       {/* ─── Section 1: Koszty stałe ─────────────────────────── */}
       <section className="space-y-4" data-testid="fixed-costs-section">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Koszty stałe</h2>
-          <p className="text-sm text-[#475569] mt-0.5">Wpisz miesięczne kwoty</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-white">Koszty stałe</h2>
+            <div className="flex items-center gap-3 mt-0.5">
+              <p className="text-sm text-[#475569]">Wpisz miesięczne kwoty</p>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all duration-200 text-xs font-medium"
+                data-testid="add-category-btn"
+              >
+                <Plus className="w-3 h-3" />
+                Dodaj nowy koszt stały
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -537,6 +583,120 @@ export const HousingExpenses = () => {
           )}
         </AnimatePresence>
       </section>
+
+      {/* ─── Add Category Modal ───────────────────────────────── */}
+      <AnimatePresence>
+        {showAddModal && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowAddModal(false)}
+            />
+            {/* Dialog */}
+            <motion.div
+              key="modal"
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed inset-0 z-50 flex items-center justify-center px-4 pointer-events-none"
+            >
+              <div
+                className="pointer-events-auto w-full max-w-sm bg-[#151A23] border border-white/10 rounded-2xl p-6 shadow-2xl"
+                data-testid="add-category-modal"
+              >
+                {/* Modal header */}
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-base font-semibold text-white">Nowy koszt stały</h3>
+                    <p className="text-xs text-[#475569] mt-0.5">Dodaj kategorię do Kosztów stałych</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="p-1.5 rounded-lg text-[#475569] hover:text-white hover:bg-white/5 transition-colors"
+                    data-testid="add-category-modal-close"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Name input */}
+                <div className="space-y-1.5 mb-4">
+                  <label className="text-xs font-medium text-[#94A3B8] uppercase tracking-wider">
+                    Nazwa kategorii
+                  </label>
+                  <input
+                    type="text"
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                    placeholder="np. Parking, Abonament..."
+                    maxLength={40}
+                    className="w-full bg-[#0B0E14] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-[#475569] outline-none focus:border-emerald-500/50 transition-colors"
+                    data-testid="add-category-name-input"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Icon picker */}
+                <div className="space-y-1.5 mb-6">
+                  <label className="text-xs font-medium text-[#94A3B8] uppercase tracking-wider">
+                    Ikona
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {Object.entries(ICON_MAP).map(([key, IconComponent]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setNewCatIcon(key)}
+                        className={`flex items-center justify-center rounded-xl h-10 border transition-all duration-150 ${
+                          newCatIcon === key
+                            ? 'bg-emerald-500/20 border-emerald-500/50'
+                            : 'bg-[#0B0E14] border-white/5 hover:border-white/15'
+                        }`}
+                        data-testid={`icon-option-${key}`}
+                        title={key}
+                      >
+                        <IconComponent
+                          className="w-4 h-4"
+                          style={{ color: newCatIcon === key ? '#10B981' : '#475569' }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm text-[#94A3B8] hover:bg-white/5 transition-colors"
+                  >
+                    Anuluj
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddCategory}
+                    disabled={addingSaving || !newCatName.trim()}
+                    className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-sm font-semibold text-[#0B0E14] transition-colors"
+                    data-testid="add-category-submit"
+                  >
+                    {addingSaving ? 'Dodaję...' : 'Dodaj'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

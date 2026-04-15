@@ -348,6 +348,28 @@ export const useSupabase = () => {
     }
   }, []);
 
+  const addFixedCostCategory = useCallback(async (name, iconKey) => {
+    try {
+      const { data: existing } = await db
+        .from('housing_categories')
+        .select('sort_order')
+        .order('sort_order', { ascending: false })
+        .limit(1);
+      const nextOrder = existing && existing.length > 0 ? (existing[0].sort_order + 1) : 1;
+
+      const { data, error: err } = await db
+        .from('housing_categories')
+        .insert({ name, icon_key: iconKey, sort_order: nextOrder })
+        .select()
+        .single();
+      if (err) throw err;
+      return data;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    }
+  }, []);
+
   return {
     db,
     loading,
@@ -375,5 +397,6 @@ export const useSupabase = () => {
     fetchMonthlySnapshots,
     saveMonthlySnapshot,
     deleteMonthlySnapshot,
+    addFixedCostCategory,
   };
 };
